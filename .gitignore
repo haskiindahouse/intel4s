@@ -1,0 +1,7 @@
+metals-main/
+metals-v2/
+out
+.bsp
+.scala-build
+.scalex/
+scalex-workspace/

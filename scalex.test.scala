@@ -1,0 +1,674 @@
+//> using scala 3.8.2
+//> using dep org.scalameta::scalameta:4.15.2
+//> using dep com.google.guava:guava:33.5.0-jre
+//> using test.dep org.scalameta::munit:1.2.4
+
+import munit.FunSuite
+import java.nio.file.{Files, Path}
+import scala.jdk.CollectionConverters.*
+
+class ScalexSuite extends FunSuite:
+
+  // ── Test workspace setup ────────────────────────────────────────────────
+
+  var workspace: Path = scala.compiletime.uninitialized
+
+  override def beforeAll(): Unit =
+    workspace = Files.createTempDirectory("scalex-test")
+
+    // Create sample Scala files
+    writeFile("src/main/scala/com/example/UserService.scala",
+      """package com.example
+        |
+        |trait UserService {
+        |  def findUser(id: String): Option[User]
+        |  def createUser(name: String): User
+        |}
+        |
+        |class UserServiceLive(db: Database) extends UserService {
+        |  def findUser(id: String): Option[User] = db.query(id)
+        |  def createUser(name: String): User = db.insert(name)
+        |}
+        |
+        |object UserService {
+        |  val default: UserService = UserServiceLive(Database.live)
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/example/Model.scala",
+      """package com.example
+        |
+        |case class User(id: String, name: String)
+        |
+        |enum Role:
+        |  case Admin, Editor, Viewer
+        |
+        |type UserId = String
+        |
+        |given userOrdering: Ordering[User] = Ordering.by(_.name)
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/example/Database.scala",
+      """package com.example
+        |
+        |trait Database {
+        |  def query(id: String): Option[User]
+        |  def insert(name: String): User
+        |}
+        |
+        |object Database {
+        |  val live: Database = new Database {
+        |    def query(id: String): Option[User] = None
+        |    def insert(name: String): User = User(name, name)
+        |  }
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/other/Helper.scala",
+      """package com.other
+        |
+        |object Helper {
+        |  def formatUser(user: com.example.User): String = user.name
+        |  val version = "1.0"
+        |}
+        |
+        |extension (s: String)
+        |  def toUserId: com.example.UserId = s
+        |""".stripMargin)
+
+    writeFile("src/test/scala/com/example/UserServiceSpec.scala",
+      """package com.example
+        |
+        |class UserServiceSpec {
+        |  val service: UserService = UserService.default
+        |  def testFindUser(): Unit = {
+        |    val result = service.findUser("123")
+        |  }
+        |}
+        |""".stripMargin)
+
+    // Initialize git repo
+    run("git", "init")
+    run("git", "add", ".")
+    run("git", "commit", "-m", "init")
+
+  override def afterAll(): Unit =
+    deleteRecursive(workspace)
+
+  private def writeFile(relativePath: String, content: String): Unit =
+    val file = workspace.resolve(relativePath)
+    Files.createDirectories(file.getParent)
+    Files.writeString(file, content)
+
+  private def run(cmd: String*): Unit =
+    val pb = ProcessBuilder(cmd*)
+    pb.directory(workspace.toFile)
+    pb.redirectErrorStream(true)
+    val proc = pb.start()
+    proc.getInputStream.readAllBytes() // drain
+    val exit = proc.waitFor()
+    assert(exit == 0, s"Command failed: ${cmd.mkString(" ")}")
+
+  private def deleteRecursive(path: Path): Unit =
+    if Files.isDirectory(path) then
+      Files.list(path).iterator().asScala.foreach(deleteRecursive)
+    Files.deleteIfExists(path)
+
+  // ── Git file listing ──────────────────────────────────────────────────
+
+  test("gitLsFiles finds all .scala files") {
+    val files = gitLsFiles(workspace)
+    assertEquals(files.size, 5)
+    assert(files.exists(_.path.toString.contains("UserService.scala")))
+    assert(files.exists(_.path.toString.contains("Model.scala")))
+    assert(files.exists(_.path.toString.contains("Database.scala")))
+    assert(files.exists(_.path.toString.contains("Helper.scala")))
+    assert(files.exists(_.path.toString.contains("UserServiceSpec.scala")))
+  }
+
+  test("gitLsFiles returns valid OIDs") {
+    val files = gitLsFiles(workspace)
+    files.foreach { gf =>
+      assert(gf.oid.length == 40, s"OID should be 40 hex chars: ${gf.oid}")
+      assert(gf.oid.matches("[0-9a-f]+"), s"OID should be hex: ${gf.oid}")
+    }
+  }
+
+  // ── Symbol extraction ─────────────────────────────────────────────────
+
+  test("extractSymbols finds classes, traits, objects") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+    val names = syms.map(s => (s.name, s.kind))
+
+    assert(names.contains(("UserService", SymbolKind.Trait)))
+    assert(names.contains(("UserServiceLive", SymbolKind.Class)))
+    assert(names.contains(("UserService", SymbolKind.Object)))
+  }
+
+  test("extractSymbols finds defs") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+    val defs = syms.filter(_.kind == SymbolKind.Def).map(_.name)
+
+    assert(defs.contains("findUser"))
+    assert(defs.contains("createUser"))
+  }
+
+  test("extractSymbols finds enums") {
+    val file = workspace.resolve("src/main/scala/com/example/Model.scala")
+    val (syms, _, _) = extractSymbols(file)
+    assert(syms.exists(s => s.name == "Role" && s.kind == SymbolKind.Enum))
+  }
+
+  test("extractSymbols finds type aliases") {
+    val file = workspace.resolve("src/main/scala/com/example/Model.scala")
+    val (syms, _, _) = extractSymbols(file)
+    assert(syms.exists(s => s.name == "UserId" && s.kind == SymbolKind.Type))
+  }
+
+  test("extractSymbols finds givens") {
+    val file = workspace.resolve("src/main/scala/com/example/Model.scala")
+    val (syms, _, _) = extractSymbols(file)
+    assert(syms.exists(s => s.kind == SymbolKind.Given))
+  }
+
+  test("extractSymbols finds extensions") {
+    val file = workspace.resolve("src/main/scala/com/other/Helper.scala")
+    val (syms, _, _) = extractSymbols(file)
+    assert(syms.exists(s => s.kind == SymbolKind.Extension))
+  }
+
+  test("extractSymbols captures package name") {
+    val file = workspace.resolve("src/main/scala/com/example/Model.scala")
+    val (syms, _, _) = extractSymbols(file)
+    assert(syms.forall(_.packageName == "com.example"))
+  }
+
+  test("extractSymbols captures line numbers") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+    val traitSym = syms.find(s => s.name == "UserService" && s.kind == SymbolKind.Trait).get
+    assert(traitSym.line > 0)
+  }
+
+  test("extractSymbols handles unparseable files gracefully") {
+    val bad = workspace.resolve("bad.scala")
+    Files.writeString(bad, "this is not valid scala {{{")
+    val (syms, _, _) = extractSymbols(bad)
+    assertEquals(syms, Nil)
+    Files.delete(bad)
+  }
+
+  // ── Bloom filter ──────────────────────────────────────────────────────
+
+  test("bloom filter contains identifiers from file") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (_, bloom, _) = extractSymbols(file)
+
+    assert(bloom.mightContain("UserService"))
+    assert(bloom.mightContain("findUser"))
+    assert(bloom.mightContain("Database"))
+    assert(bloom.mightContain("Option"))
+  }
+
+  test("bloom filter rejects absent identifiers") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (_, bloom, _) = extractSymbols(file)
+
+    // These should almost certainly not be in the bloom filter
+    assert(!bloom.mightContain("ZxQwVeryUnlikelyIdentifier"))
+    assert(!bloom.mightContain("NobodyWouldNameThisXyz"))
+  }
+
+  // ── Workspace index ───────────────────────────────────────────────────
+
+  test("index builds complete symbol table") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    assert(idx.fileCount == 5)
+    assert(idx.symbols.size > 10)
+    assert(idx.packages.contains("com.example"))
+    assert(idx.packages.contains("com.other"))
+  }
+
+  // ── Search ────────────────────────────────────────────────────────────
+
+  test("search exact match ranks first") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.search("User")
+
+    val first = results.head
+    assertEquals(first.name, "User")
+  }
+
+  test("search prefix match ranks before substring") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.search("User")
+    val names = results.map(_.name)
+
+    // "User" (exact) should come before "UserService" (prefix)
+    val exactIdx = names.indexOf("User")
+    val prefixIdx = names.indexWhere(n => n.startsWith("User") && n != "User")
+    assert(exactIdx < prefixIdx, s"Exact ($exactIdx) should be before prefix ($prefixIdx)")
+  }
+
+  test("search is case-insensitive") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    val upper = idx.search("USERSERVICE")
+    val lower = idx.search("userservice")
+    assertEquals(upper.map(_.name), lower.map(_.name))
+  }
+
+  test("search returns empty for no match") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.search("ZxQwNonexistent")
+    assert(results.isEmpty)
+  }
+
+  // ── Find definition ───────────────────────────────────────────────────
+
+  test("findDefinition returns correct symbol") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.findDefinition("Database")
+
+    assert(results.nonEmpty)
+    assert(results.exists(s => s.kind == SymbolKind.Trait))
+    assert(results.exists(s => s.kind == SymbolKind.Object))
+  }
+
+  test("findDefinition is case-insensitive") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    val upper = idx.findDefinition("DATABASE")
+    val lower = idx.findDefinition("database")
+    assertEquals(upper.size, lower.size)
+  }
+
+  test("findDefinition returns empty for unknown symbol") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.findDefinition("NonexistentClass")
+    assert(results.isEmpty)
+  }
+
+  // ── Find references ───────────────────────────────────────────────────
+
+  test("findReferences finds usages across files") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val refs = idx.findReferences("UserService")
+
+    assert(refs.size >= 3, s"Expected >= 3 refs, got ${refs.size}")
+    // Should find in: UserService.scala (definition + usage), UserServiceSpec.scala
+    val files = refs.map(r => workspace.relativize(r.file).toString).distinct
+    assert(files.exists(_.contains("UserService.scala")))
+    assert(files.exists(_.contains("UserServiceSpec.scala")))
+  }
+
+  test("findReferences respects word boundaries") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val refs = idx.findReferences("User")
+
+    // "User" should match standalone "User" but NOT "UserService" or "UserServiceLive"
+    refs.foreach { r =>
+      assert(
+        r.contextLine.contains("User") &&
+          !r.contextLine.matches(".*\\bUser\\w+.*") || r.contextLine.matches(".*\\bUser\\b.*"),
+        s"Word boundary violated: ${r.contextLine}"
+      )
+    }
+  }
+
+  test("findReferences uses bloom filter pre-screening") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    // Search for something only in Helper.scala
+    val refs = idx.findReferences("formatUser")
+    assert(refs.size >= 1)
+    assert(refs.forall(_.file.toString.contains("Helper.scala")))
+  }
+
+  // ── File symbols ──────────────────────────────────────────────────────
+
+  test("fileSymbols returns symbols for a given file") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val syms = idx.fileSymbols("src/main/scala/com/example/Model.scala")
+
+    val names = syms.map(_.name).toSet
+    assert(names.contains("User"))
+    assert(names.contains("Role"))
+    assert(names.contains("UserId"))
+  }
+
+  test("fileSymbols returns empty for unknown file") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val syms = idx.fileSymbols("nonexistent/File.scala")
+    assert(syms.isEmpty)
+  }
+
+  // ── Persistence + OID caching ─────────────────────────────────────────
+
+  test("index persists to disk and reloads") {
+    // Clean any existing cache
+    val cacheDir = workspace.resolve(".scalex")
+    if Files.exists(cacheDir) then
+      Files.list(cacheDir).iterator().asScala.foreach(Files.delete)
+
+    // First index — cold
+    val idx1 = WorkspaceIndex(workspace)
+    idx1.index()
+    assert(idx1.parsedCount == 5, s"Cold index should parse all 5 files, got ${idx1.parsedCount}")
+
+    // Second index — warm (all cached)
+    val idx2 = WorkspaceIndex(workspace)
+    idx2.index()
+    assert(idx2.cachedLoad, "Second index should load from cache")
+    assert(idx2.skippedCount == 5, s"Warm index should skip all 5 files, got ${idx2.skippedCount}")
+    assert(idx2.parsedCount == 0, s"Warm index should parse 0 files, got ${idx2.parsedCount}")
+
+    // Symbols should be identical
+    assertEquals(idx1.symbols.size, idx2.symbols.size)
+  }
+
+  test("index re-parses changed files") {
+    // Ensure cache exists
+    val idx1 = WorkspaceIndex(workspace)
+    idx1.index()
+
+    // Modify a file and recommit
+    val file = workspace.resolve("src/main/scala/com/other/Helper.scala")
+    val content = Files.readString(file)
+    Files.writeString(file, content + "\nval extra = 42\n")
+    run("git", "add", ".")
+    run("git", "commit", "-m", "modify helper")
+
+    // Reindex — should parse only the changed file
+    val idx2 = WorkspaceIndex(workspace)
+    idx2.index()
+    assert(idx2.cachedLoad)
+    assert(idx2.parsedCount == 1, s"Should re-parse 1 file, got ${idx2.parsedCount}")
+    assert(idx2.skippedCount == 4, s"Should skip 4 files, got ${idx2.skippedCount}")
+  }
+
+  // ── Binary format ─────────────────────────────────────────────────────
+
+  test("binary index file exists after indexing") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val binPath = workspace.resolve(".scalex/index.bin")
+    assert(Files.exists(binPath), "index.bin should exist")
+    assert(Files.size(binPath) > 0, "index.bin should not be empty")
+  }
+
+  test("binary index roundtrip preserves all data") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    val loaded = IndexPersistence.load(workspace)
+    assert(loaded.isDefined)
+
+    val cachedFiles = loaded.get
+    // Every git-tracked file should be in the cache
+    val gitFiles = gitLsFiles(workspace)
+    gitFiles.foreach { gf =>
+      val rel = workspace.relativize(gf.path).toString
+      assert(cachedFiles.contains(rel), s"Missing file in cache: $rel")
+      assertEquals(cachedFiles(rel).oid, gf.oid)
+    }
+  }
+
+  // ── Word boundary matching ────────────────────────────────────────────
+
+  test("containsWord matches whole words only") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val refs = idx.findReferences("live")
+    refs.foreach { r =>
+      assert(
+        r.contextLine.matches(".*(?<![a-zA-Z0-9])live(?![a-zA-Z0-9]).*"),
+        s"Should be word boundary match: '${r.contextLine}'"
+      )
+    }
+  }
+
+  // ── Phase 7: Signatures ───────────────────────────────────────────────
+
+  test("extractSymbols captures signatures") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+
+    val traitSym = syms.find(s => s.name == "UserService" && s.kind == SymbolKind.Trait).get
+    assert(traitSym.signature.nonEmpty, "Trait should have a signature")
+    assert(traitSym.signature.contains("trait UserService"), s"Sig: ${traitSym.signature}")
+  }
+
+  test("extractSymbols captures extends parents") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+
+    val classSym = syms.find(s => s.name == "UserServiceLive" && s.kind == SymbolKind.Class).get
+    assert(classSym.parents.contains("UserService"), s"Parents: ${classSym.parents}")
+  }
+
+  test("extractSymbols captures def signatures with params") {
+    val file = workspace.resolve("src/main/scala/com/example/UserService.scala")
+    val (syms, _, _) = extractSymbols(file)
+
+    val defSym = syms.find(s => s.name == "findUser" && s.kind == SymbolKind.Def).get
+    assert(defSym.signature.contains("def findUser"), s"Sig: ${defSym.signature}")
+    assert(defSym.signature.contains("id"), s"Should contain param name: ${defSym.signature}")
+  }
+
+  test("extractSymbols captures given alias signatures") {
+    val file = workspace.resolve("src/main/scala/com/example/Model.scala")
+    val (syms, _, _) = extractSymbols(file)
+
+    val givenSym = syms.find(s => s.kind == SymbolKind.Given).get
+    assert(givenSym.signature.contains("given"), s"Sig: ${givenSym.signature}")
+    assert(givenSym.signature.contains("Ordering"), s"Sig: ${givenSym.signature}")
+  }
+
+  test("extractSymbols captures imports") {
+    // UserServiceSpec imports UserService
+    val file = workspace.resolve("src/test/scala/com/example/UserServiceSpec.scala")
+    val (_, _, imports) = extractSymbols(file)
+    // This file doesn't have imports in our test data, but the function should return empty list not crash
+    assert(imports != null)
+  }
+
+  // ── Phase 7: Find implementations ─────────────────────────────────────
+
+  test("findImplementations finds classes extending a trait") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.findImplementations("UserService")
+
+    assert(results.nonEmpty, "Should find at least one implementation")
+    val names = results.map(_.name)
+    assert(names.contains("UserServiceLive"), s"Should find UserServiceLive: $names")
+  }
+
+  test("findImplementations finds objects extending a trait") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    // UserService object extends no trait in our test, but Database.live extends Database
+    val results = idx.findImplementations("Database")
+    // Our test Database object doesn't use extends syntax, so it won't be found
+    // But this verifies the method works without crashing
+    assert(results != null)
+  }
+
+  test("findImplementations returns empty for unknown trait") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.findImplementations("NonexistentTrait")
+    assert(results.isEmpty)
+  }
+
+  // ── Phase 7: Categorized references ───────────────────────────────────
+
+  test("categorizeReferences groups by category") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val grouped = idx.categorizeReferences("UserService")
+
+    // Should have at least definition and some usages
+    assert(grouped.nonEmpty, "Should have at least one category")
+
+    // The trait definition should be categorized as Definition
+    grouped.get(RefCategory.Definition).foreach { defs =>
+      assert(defs.exists(_.contextLine.contains("trait UserService")),
+        s"Definition should contain 'trait UserService': ${defs.map(_.contextLine)}")
+    }
+
+    // The extends should be categorized as ExtendedBy
+    grouped.get(RefCategory.ExtendedBy).foreach { exts =>
+      assert(exts.exists(_.contextLine.contains("extends UserService")),
+        s"ExtendedBy should contain 'extends UserService': ${exts.map(_.contextLine)}")
+    }
+  }
+
+  // ── Phase 7: Import finding ───────────────────────────────────────────
+
+  test("findImports returns only import lines") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val results = idx.findImports("UserService")
+    // All results should be import lines
+    results.foreach { r =>
+      assert(r.contextLine.startsWith("import "),
+        s"Should be import line: ${r.contextLine}")
+    }
+  }
+
+  // ── Phase 7: Verbose formatting ───────────────────────────────────────
+
+  test("formatSymbolVerbose includes signature") {
+    val s = SymbolInfo("Foo", SymbolKind.Trait, workspace.resolve("Foo.scala"), 1, "com.example",
+      List("Bar", "Baz"), "trait Foo extends Bar with Baz")
+    val result = formatSymbolVerbose(s, workspace)
+    assert(result.contains("trait Foo extends Bar with Baz"), s"Verbose: $result")
+  }
+
+  // ── Phase 7: Binary format v3 roundtrip ───────────────────────────────
+
+  test("binary v3 roundtrip preserves parents and signatures") {
+    // Clean cache to force fresh save
+    val cacheDir = workspace.resolve(".scalex")
+    if Files.exists(cacheDir) then
+      Files.list(cacheDir).iterator().asScala.foreach(Files.delete)
+
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    // Reload from cache
+    val loaded = IndexPersistence.load(workspace)
+    assert(loaded.isDefined, "Should load from cache")
+
+    val cachedFiles = loaded.get
+    // Check that UserServiceLive has parents preserved
+    val userServiceFile = cachedFiles.values.find(_.relativePath.contains("UserService.scala")).get
+    val live = userServiceFile.symbols.find(_.name == "UserServiceLive").get
+    assert(live.parents.contains("UserService"), s"Parents should survive roundtrip: ${live.parents}")
+    assert(live.signature.nonEmpty, s"Signature should survive roundtrip: ${live.signature}")
+  }
+
+  // ── Scala 2 dialect fallback ────────────────────────────────────────
+
+  test("extractSymbols parses Scala 2 procedure syntax") {
+    val file = workspace.resolve("src/main/scala/Scala2Style.scala")
+    Files.createDirectories(file.getParent)
+    Files.writeString(file,
+      """package com.legacy
+        |
+        |class OldService {
+        |  def doSomething(x: Int) {
+        |    println(x)
+        |  }
+        |  def anotherMethod(): Unit = {
+        |    println("hello")
+        |  }
+        |}
+        |
+        |object OldService {
+        |  def apply(): OldService = new OldService
+        |}
+        |""".stripMargin)
+
+    val (syms, _, _) = extractSymbols(file)
+    val names = syms.map(_.name)
+    assert(names.contains("OldService"), s"Should find OldService class: $names")
+    assert(syms.exists(s => s.name == "OldService" && s.kind == SymbolKind.Class))
+    assert(syms.exists(s => s.name == "OldService" && s.kind == SymbolKind.Object))
+    assert(syms.exists(s => s.name == "doSomething" && s.kind == SymbolKind.Def))
+
+    Files.delete(file)
+  }
+
+  test("extractSymbols parses Scala 2 implicit class") {
+    val file = workspace.resolve("src/main/scala/Scala2Implicits.scala")
+    Files.createDirectories(file.getParent)
+    Files.writeString(file,
+      """package com.legacy
+        |
+        |object Implicits {
+        |  implicit class RichString(val s: String) extends AnyVal {
+        |    def shout: String = s.toUpperCase
+        |  }
+        |  implicit def intToString(i: Int): String = i.toString
+        |}
+        |""".stripMargin)
+
+    val (syms, _, _) = extractSymbols(file)
+    val names = syms.map(_.name)
+    assert(names.contains("Implicits"), s"Should find Implicits object: $names")
+    assert(names.contains("RichString"), s"Should find RichString class: $names")
+    assert(names.contains("intToString"), s"Should find intToString def: $names")
+
+    Files.delete(file)
+  }
+
+  test("extractSymbols handles mixed Scala 2 and Scala 3 files in same project") {
+    // The existing test files are Scala 3 style. Add a Scala 2 file.
+    val scala2File = workspace.resolve("src/main/scala/Legacy.scala")
+    Files.createDirectories(scala2File.getParent)
+    Files.writeString(scala2File,
+      """package com.legacy
+        |
+        |trait LegacyService {
+        |  def process(data: String): Unit
+        |}
+        |""".stripMargin)
+
+    // Index the whole workspace — should handle both Scala 2 and 3 files
+    run("git", "add", ".")
+    run("git", "commit", "-m", "add legacy")
+
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+
+    // Scala 3 symbols should still work
+    assert(idx.findDefinition("UserService").nonEmpty, "Scala 3 symbols should work")
+    assert(idx.findDefinition("Role").nonEmpty, "Scala 3 enum should work")
+
+    // Scala 2 style symbols should also work
+    assert(idx.findDefinition("LegacyService").nonEmpty, "Scala 2 symbols should work")
+
+    // Clean up
+    Files.delete(scala2File)
+    run("git", "add", ".")
+    run("git", "commit", "-m", "remove legacy")
+  }

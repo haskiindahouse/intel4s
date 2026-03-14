@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scalex — Scala Code Intelligence for AI Agents</title>
+  <meta name="description" content="~700 lines. Zero compilation. Zero build server. Search symbols, find definitions, find implementations, find references — all from source.">
+
+  <!-- OpenGraph -->
+  <meta property="og:title" content="Scalex — Scala Code Intelligence for AI Agents">
+  <meta property="og:description" content="~700 lines. Zero compilation. Zero build server. Just answers.">
+  <meta property="og:image" content="https://nguyenyou.github.io/scalex/og-banner.png">
+  <meta property="og:url" content="https://nguyenyou.github.io/scalex">
+  <meta property="og:type" content="website">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Scalex — Scala Code Intelligence for AI Agents">
+  <meta name="twitter:description" content="~700 lines. Zero compilation. Zero build server. Just answers.">
+  <meta name="twitter:image" content="https://nguyenyou.github.io/scalex/og-banner.png">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-code: #1a1a26;
+      --text: #e8e6e3;
+      --text-dim: #7a7884;
+      --red: #dc322f;
+      --red-glow: rgba(220, 50, 47, 0.15);
+      --red-dim: #a82825;
+      --green: #4ec9b0;
+      --yellow: #d4a843;
+      --blue: #569cd6;
+      --purple: #c586c0;
+      --border: #1e1e2a;
+      --font-display: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: var(--font-display);
+      font-weight: 300;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* --- Noise texture overlay --- */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* --- Hero --- */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(600px, 100vw);
+      height: min(600px, 100vw);
+      background: radial-gradient(circle, var(--red-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero > * { position: relative; z-index: 1; }
+
+    .mascot {
+      width: 180px;
+      height: 255px;
+      filter: drop-shadow(0 0 60px rgba(220, 50, 47, 0.2));
+      animation: float 6s ease-in-out infinite;
+      margin-bottom: 2rem;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: clamp(3rem, 8vw, 6rem);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+
+    h1 .red { color: var(--red); }
+
+    .tagline {
+      font-size: clamp(1rem, 2.5vw, 1.35rem);
+      color: var(--text-dim);
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+
+    .tagline strong { color: var(--text); font-weight: 500; }
+
+    .stats {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 3rem;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--red);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 2rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .cta-primary {
+      background: var(--red);
+      color: white;
+      border: 1px solid var(--red);
+    }
+
+    .cta-primary:hover {
+      background: var(--red-dim);
+      box-shadow: 0 0 30px var(--red-glow);
+    }
+
+    .cta-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .cta-secondary:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    /* --- Sections --- */
+    section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 6rem 2rem;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 2.2rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    h2 .red { color: var(--red); }
+
+    .section-sub {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      margin-bottom: 3rem;
+      max-width: 600px;
+    }
+
+    /* --- Terminal --- */
+    .terminal {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 2rem 0;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .terminal-dot:nth-child(1) { background: #ff5f57; }
+    .terminal-dot:nth-child(2) { background: #febc2e; }
+    .terminal-dot:nth-child(3) { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .terminal-body .prompt { color: var(--green); }
+    .terminal-body .cmd { color: var(--text); font-weight: 600; }
+    .terminal-body .flag { color: var(--yellow); }
+    .terminal-body .arg { color: var(--blue); }
+    .terminal-body .kind { color: var(--purple); }
+    .terminal-body .dim { color: var(--text-dim); }
+    .terminal-body .result { color: var(--text-dim); }
+    .terminal-body .file { color: var(--green); }
+    .terminal-body .symbol { color: var(--text); font-weight: 600; }
+
+    /* --- Command Grid --- */
+    .cmd-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .cmd-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      transition: all 0.2s;
+    }
+
+    .cmd-card:hover {
+      border-color: var(--red);
+      box-shadow: 0 0 20px var(--red-glow);
+      transform: translateY(-2px);
+    }
+
+    .cmd-name {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--red);
+      margin-bottom: 0.5rem;
+    }
+
+    .cmd-desc {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* --- Benchmark table --- */
+    .bench-wrap {
+      overflow-x: auto;
+      margin: 2rem 0;
+    }
+
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .bench-table th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 0.7rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .bench-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .bench-table tr:hover td {
+      background: rgba(220, 50, 47, 0.03);
+    }
+
+    .bench-table .fast { color: var(--green); font-weight: 600; }
+
+    /* --- Install section --- */
+    .install-code {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text);
+      margin: 1rem 0;
+      position: relative;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      overflow-x: auto;
+      word-break: break-all;
+    }
+
+    .install-code:hover { border-color: var(--red); }
+
+    .install-code .comment { color: var(--text-dim); }
+
+    /* --- Footer --- */
+    footer {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    footer a {
+      color: var(--red);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    .built-with {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      opacity: 0.6;
+    }
+
+    /* --- Scroll reveal --- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 640px) {
+      .stats { gap: 1.5rem; }
+      .cta-group { flex-direction: column; align-items: center; }
+      .cmd-grid { grid-template-columns: 1fr; }
+      section { padding: 4rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <img src="Kestrel.png" alt="Scalex Kestrel" class="mascot">
+    <h1>Scal<span class="red">ex</span></h1>
+    <p class="tagline">Scala code intelligence for AI coding agents.<br><strong>~700 lines. Zero compilation. Zero build server. Just answers.</strong></p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">214k</div>
+        <div class="stat-label">Symbols Indexed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">364ms</div>
+        <div class="stat-label">Warm Query</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">~700</div>
+        <div class="stat-label">Lines of Code</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Dependencies on Build Server</div>
+      </div>
+    </div>
+
+    <div class="cta-group">
+      <a href="https://github.com/nguyenyou/scalex" class="cta cta-primary">View on GitHub</a>
+      <a href="#install" class="cta cta-secondary">Install →</a>
+    </div>
+  </section>
+
+  <!-- Demo -->
+  <section class="reveal">
+    <h2>One command. <span class="red">One answer.</span></h2>
+    <p class="section-sub">AI agents don't need regex. They need structured, Scala-aware responses in a single tool call.</p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot"></div>
+        <div class="terminal-dot"></div>
+        <div class="terminal-dot"></div>
+        <div class="terminal-title">scalex — scala3-compiler (17.7k files)</div>
+      </div>
+      <div class="terminal-body">
+        <span class="prompt">$</span> <span class="cmd">scalex</span> <span class="cmd">def</span> <span class="arg">Compiler</span> <span class="flag">--verbose</span><br>
+        <br>
+        <span class="kind">&nbsp;&nbsp;class</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">Compiler</span> <span class="dim">(dotty.tools)</span> — <span class="file">compiler/src/.../Compiler.scala:16</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class Compiler</span><br>
+        <span class="kind">&nbsp;&nbsp;trait</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">Compiler</span> <span class="dim">(scala.quoted)</span> — <span class="file">staging/src/.../Compiler.scala:8</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trait Compiler</span><br>
+        <span class="kind">&nbsp;&nbsp;object</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">Compiler</span> <span class="dim">(scala.quoted)</span> — <span class="file">staging/src/.../Compiler.scala:12</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;object Compiler</span><br>
+        <br>
+        <span class="prompt">$</span> <span class="cmd">scalex</span> <span class="cmd">impl</span> <span class="arg">Compiler</span> <span class="flag">--verbose</span><br>
+        <br>
+        <span class="kind">&nbsp;&nbsp;class</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">ExpressionCompiler</span> — <span class="file">.../ExpressionCompiler.scala:18</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class ExpressionCompiler extends Compiler</span><br>
+        <span class="kind">&nbsp;&nbsp;class</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">TASTYCompiler</span> — <span class="file">.../TASTYCompiler.scala:9</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class TASTYCompiler extends Compiler</span><br>
+        <span class="kind">&nbsp;&nbsp;class</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">InteractiveCompiler</span> — <span class="file">.../InteractiveCompiler.scala:10</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class InteractiveCompiler extends Compiler</span><br>
+        <span class="kind">&nbsp;&nbsp;class</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="symbol">ReplCompiler</span> — <span class="file">.../ReplCompiler.scala:34</span><br>
+        <span class="dim">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class ReplCompiler extends Compiler</span><br>
+      </div>
+    </div>
+  </section>
+
+  <!-- Commands -->
+  <section class="reveal">
+    <h2>9 commands. <span class="red">Zero config.</span></h2>
+    <p class="section-sub">Point it at any git repo with Scala files. Works on Scala 2 and 3, auto-detects dialect per file.</p>
+
+    <div class="cmd-grid">
+      <div class="cmd-card">
+        <div class="cmd-name">scalex search</div>
+        <div class="cmd-desc">Search symbols by name. Fuzzy match, ranked by relevance. Filter by kind.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex def</div>
+        <div class="cmd-desc">Where is this defined? Finds traits, classes, objects, givens — things grep misses.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex impl</div>
+        <div class="cmd-desc">Who extends this trait? Exact parent matching from the AST, no substring noise.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex refs</div>
+        <div class="cmd-desc">Who uses this symbol? With --categorize: grouped by definition, extends, import, type, comment.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex imports</div>
+        <div class="cmd-desc">Who imports this symbol? Clean dependency view — which files depend on what.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex symbols</div>
+        <div class="cmd-desc">What's in this file? All classes, traits, defs, vals with signatures.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex packages</div>
+        <div class="cmd-desc">What packages exist in this project?</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex batch</div>
+        <div class="cmd-desc">Multiple queries, one index load. 5 queries in ~1s instead of ~5s.</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-name">scalex index</div>
+        <div class="cmd-desc">Force reindex. Normally automatic — every command auto-indexes.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Performance -->
+  <section class="reveal">
+    <h2>Benchmarks on <span class="red">real codebases.</span></h2>
+    <p class="section-sub">Tested on the Scala 3 compiler itself. Native binary, GraalVM.</p>
+
+    <div class="bench-wrap">
+    <table class="bench-table">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Files</th>
+          <th>Symbols</th>
+          <th>Cold Index</th>
+          <th>Warm Index</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Small library</td>
+          <td>92</td>
+          <td>259</td>
+          <td class="fast">~50ms</td>
+          <td class="fast">~10ms</td>
+        </tr>
+        <tr>
+          <td>Mill build tool</td>
+          <td>1,415</td>
+          <td>12,778</td>
+          <td class="fast">214ms</td>
+          <td class="fast">50ms</td>
+        </tr>
+        <tr>
+          <td>Production monorepo</td>
+          <td>13,958</td>
+          <td>214,803</td>
+          <td>3.3s</td>
+          <td class="fast">364ms</td>
+        </tr>
+        <tr>
+          <td>Scala 3 compiler</td>
+          <td>17,731</td>
+          <td>202,916</td>
+          <td>3.1s</td>
+          <td class="fast">723ms</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="reveal" id="install">
+    <h2>Get started in <span class="red">10 seconds.</span></h2>
+
+    <h3 style="color: var(--red); margin-bottom: 0.5rem; margin-top: 2rem;">Claude Code users</h3>
+    <p class="section-sub" style="margin-bottom: 1.5rem;">The fastest way — installs the binary + skill in one step.</p>
+
+    <div class="install-code">
+      <span class="comment"># In Claude Code, run:</span><br>
+      /plugin marketplace add nguyenyou/scalex<br>
+      /plugin install scalex@scalex-marketplace
+    </div>
+
+    <h3 style="color: var(--red); margin-bottom: 0.5rem; margin-top: 3rem;">Other AI agents / manual install</h3>
+    <p class="section-sub" style="margin-bottom: 1.5rem;">Download the binary to <code style="color: var(--green); font-family: var(--font-mono); font-size: 0.85rem;">~/.local/bin</code>, then grab the skill.</p>
+
+    <div class="install-code">
+      <span class="comment"># 1. Install the binary (pick your platform)</span><br>
+      <br>
+      <span class="comment"># macOS Apple Silicon</span><br>
+      mkdir -p ~/.local/bin<br>
+      curl -fsSL https://github.com/nguyenyou/scalex/releases/latest/download/scalex-macos-arm64 -o ~/.local/bin/scalex && chmod +x ~/.local/bin/scalex<br>
+      <br>
+      <span class="comment"># macOS Intel</span><br>
+      mkdir -p ~/.local/bin<br>
+      curl -fsSL https://github.com/nguyenyou/scalex/releases/latest/download/scalex-macos-x64 -o ~/.local/bin/scalex && chmod +x ~/.local/bin/scalex<br>
+      <br>
+      <span class="comment"># Linux x64</span><br>
+      mkdir -p ~/.local/bin<br>
+      curl -fsSL https://github.com/nguyenyou/scalex/releases/latest/download/scalex-linux-x64 -o ~/.local/bin/scalex && chmod +x ~/.local/bin/scalex
+    </div>
+
+    <div class="install-code">
+      <span class="comment"># 2. Download the skill (teaches your AI agent how to use scalex)</span><br>
+      <br>
+      <span class="comment"># The skill lives at plugin/skills/scalex/SKILL.md in this repo.</span><br>
+      <span class="comment"># Download it and place it wherever your agent reads skills from.</span><br>
+      mkdir -p scalex<br>
+      curl -fsSL https://raw.githubusercontent.com/nguyenyou/scalex/main/plugin/skills/scalex/SKILL.md -o scalex/SKILL.md
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      <a href="https://github.com/nguyenyou/scalex">GitHub</a> ·
+      <a href="https://github.com/nguyenyou/scalex/releases">Releases</a> ·
+      <a href="https://github.com/nguyenyou/scalex/blob/main/docs/HOW_IT_WORKS.md">How It Works</a> ·
+      MIT License
+    </p>
+    <p class="built-with">
+      Built in a single session with Claude Code + Opus 4.6 (1M context).<br>
+      Inspired by <a href="https://scalameta.org/metals/">Metals</a> and <a href="https://scalameta.org/">Scalameta</a>.
+    </p>
+  </footer>
+
+  <script>
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

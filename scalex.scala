@@ -1,0 +1,726 @@
+//> using scala 3.8.2
+//> using dep org.scalameta::scalameta:4.15.2
+//> using dep com.google.guava:guava:33.5.0-jre
+
+import scala.meta.*
+import scala.collection.mutable
+import java.nio.file.{Files, Path}
+import java.io.{BufferedReader, BufferedInputStream, BufferedOutputStream,
+  DataInputStream, DataOutputStream, InputStreamReader}
+import java.util.concurrent.ConcurrentLinkedQueue
+import scala.jdk.CollectionConverters.*
+import com.google.common.hash.{BloomFilter, Funnels}
+
+val ScalexVersion = "1.0.0"
+
+// ── Data types ──────────────────────────────────────────────────────────────
+
+enum SymbolKind(val id: Byte):
+  case Class     extends SymbolKind(0)
+  case Trait     extends SymbolKind(1)
+  case Object    extends SymbolKind(2)
+  case Def       extends SymbolKind(3)
+  case Val       extends SymbolKind(4)
+  case Var       extends SymbolKind(5)
+  case Type      extends SymbolKind(6)
+  case Enum      extends SymbolKind(7)
+  case Given     extends SymbolKind(8)
+  case Extension extends SymbolKind(9)
+  case Package   extends SymbolKind(10)
+
+object SymbolKind:
+  private val byId: Array[SymbolKind] = values.sortBy(_.id)
+  def fromId(id: Byte): SymbolKind = byId(id)
+
+case class SymbolInfo(
+    name: String,
+    kind: SymbolKind,
+    file: Path,
+    line: Int,
+    packageName: String,
+    parents: List[String] = Nil,
+    signature: String = ""
+)
+
+case class Reference(file: Path, line: Int, contextLine: String)
+case class GitFile(path: Path, oid: String)
+
+case class IndexedFile(
+    relativePath: String,
+    oid: String,
+    symbols: List[SymbolInfo],
+    identifierBloom: BloomFilter[CharSequence],
+    imports: List[String] = Nil
+)
+
+enum RefCategory:
+  case Definition, ExtendedBy, ImportedBy, UsedAsType, Comment, Usage
+
+case class CategorizedRef(ref: Reference, category: RefCategory)
+
+// ── Git ─────────────────────────────────────────────────────────────────────
+
+def gitLsFiles(workspace: Path): List[GitFile] =
+  val pb = ProcessBuilder("git", "ls-files", "--stage")
+  pb.directory(workspace.toFile)
+  pb.redirectErrorStream(true)
+  val proc = pb.start()
+  val reader = BufferedReader(InputStreamReader(proc.getInputStream))
+  val files = reader.lines().iterator().asScala.flatMap { line =>
+    val tabIdx = line.indexOf('\t')
+    if tabIdx < 0 then None
+    else
+      val parts = line.substring(0, tabIdx).split("\\s+")
+      val path = line.substring(tabIdx + 1)
+      if parts.length >= 2 && path.endsWith(".scala") then
+        Some(GitFile(workspace.resolve(path), parts(1)))
+      else None
+  }.toList
+  proc.waitFor()
+  files
+
+// ── Symbol extraction + bloom filter ────────────────────────────────────────
+
+def buildBloomFilter(file: Path): BloomFilter[CharSequence] =
+  val bloom = BloomFilter.create(Funnels.unencodedCharsFunnel(), 500, 0.01)
+  val source = try Files.readString(file) catch
+    case _: Exception => return bloom
+  var i = 0
+  val len = source.length
+  while i < len do
+    if source(i).isLetter || source(i) == '_' then
+      val start = i
+      while i < len && (source(i).isLetterOrDigit || source(i) == '_') do i += 1
+      val word = source.substring(start, i)
+      if word.length >= 2 then bloom.put(word)
+    else
+      i += 1
+  bloom
+
+private def extractParents(templ: Template): List[String] =
+  templ.inits.flatMap { init =>
+    init.tpe match
+      case Type.Name(name) => Some(name)
+      case Type.Select(_, Type.Name(name)) => Some(name)
+      case Type.Apply.After_4_6_0(Type.Name(name), _) => Some(name)
+      case Type.Apply.After_4_6_0(Type.Select(_, Type.Name(name)), _) => Some(name)
+      case _ => None
+  }
+
+private def buildSignature(name: String, kind: String, parents: List[String], tparams: List[String] = Nil): String =
+  val tps = if tparams.nonEmpty then tparams.mkString("[", ", ", "]") else ""
+  val ext = if parents.nonEmpty then s" extends ${parents.mkString(" with ")}" else ""
+  s"$kind $name$tps$ext"
+
+private def extractImports(tree: Tree): List[String] =
+  val buf = mutable.ListBuffer.empty[String]
+  def visit(t: Tree): Unit =
+    t match
+      case i: Import => buf += i.toString()
+      case _ =>
+    t.children.foreach(visit)
+  visit(tree)
+  buf.toList
+
+def extractSymbols(file: Path): (List[SymbolInfo], BloomFilter[CharSequence], List[String]) =
+  val bloom = buildBloomFilter(file)
+
+  val source = try Files.readString(file) catch
+    case _: Exception => return (Nil, bloom, Nil)
+
+  val input = Input.VirtualFile(file.toString, source)
+  val tree = try
+    given scala.meta.Dialect = scala.meta.dialects.Scala3
+    input.parse[Source].get
+  catch
+    case _: Exception =>
+      try
+        given scala.meta.Dialect = scala.meta.dialects.Scala213
+        input.parse[Source].get
+      catch
+        case _: Exception => return (Nil, bloom, Nil)
+
+  val pkg = tree.children.collectFirst { case p: Pkg => p.ref.toString() }.getOrElse("")
+  val imports = extractImports(tree)
+  val buf = mutable.ListBuffer.empty[SymbolInfo]
+
+  def visit(t: Tree): Unit = t match
+    case d: Defn.Class =>
+      val parents = extractParents(d.templ)
+      val tparams = d.tparamClause.values.map(_.name.value)
+      val sig = buildSignature(d.name.value, "class", parents, tparams)
+      buf += SymbolInfo(d.name.value, SymbolKind.Class, file, d.pos.startLine + 1, pkg, parents, sig)
+    case d: Defn.Trait =>
+      val parents = extractParents(d.templ)
+      val tparams = d.tparamClause.values.map(_.name.value)
+      val sig = buildSignature(d.name.value, "trait", parents, tparams)
+      buf += SymbolInfo(d.name.value, SymbolKind.Trait, file, d.pos.startLine + 1, pkg, parents, sig)
+    case d: Defn.Object =>
+      val parents = extractParents(d.templ)
+      val sig = buildSignature(d.name.value, "object", parents)
+      buf += SymbolInfo(d.name.value, SymbolKind.Object, file, d.pos.startLine + 1, pkg, parents, sig)
+    case d: Defn.Enum =>
+      val parents = extractParents(d.templ)
+      val tparams = d.tparamClause.values.map(_.name.value)
+      val sig = buildSignature(d.name.value, "enum", parents, tparams)
+      buf += SymbolInfo(d.name.value, SymbolKind.Enum, file, d.pos.startLine + 1, pkg, parents, sig)
+    case d: Defn.Given =>
+      if d.name.value.nonEmpty then
+        buf += SymbolInfo(d.name.value, SymbolKind.Given, file, d.pos.startLine + 1, pkg, Nil, s"given ${d.name.value}")
+    case d: Defn.GivenAlias =>
+      if d.name.value.nonEmpty then
+        val sig = s"given ${d.name.value}: ${d.decltpe.toString()}"
+        buf += SymbolInfo(d.name.value, SymbolKind.Given, file, d.pos.startLine + 1, pkg, Nil, sig)
+    case d: Defn.Type =>
+      val sig = s"type ${d.name.value} = ${d.body.toString().take(60)}"
+      buf += SymbolInfo(d.name.value, SymbolKind.Type, file, d.pos.startLine + 1, pkg, Nil, sig)
+    case d: Defn.Def =>
+      val params = d.paramClauses.map(_.values.map(p => s"${p.name.value}: ${p.decltpe.map(_.toString()).getOrElse("?")}").mkString(", ")).mkString("(", ")(", ")")
+      val ret = d.decltpe.map(t => s": ${t.toString()}").getOrElse("")
+      val sig = s"def ${d.name.value}$params$ret"
+      buf += SymbolInfo(d.name.value, SymbolKind.Def, file, d.pos.startLine + 1, pkg, Nil, sig)
+    case d: Defn.Val =>
+      d.pats.foreach {
+        case Pat.Var(name) =>
+          val tpe = d.decltpe.map(t => s": ${t.toString()}").getOrElse("")
+          buf += SymbolInfo(name.value, SymbolKind.Val, file, d.pos.startLine + 1, pkg, Nil, s"val ${name.value}$tpe")
+        case _ =>
+      }
+    case d: Defn.ExtensionGroup =>
+      val recv = d.paramClauses.headOption.flatMap(_.values.headOption).map(p =>
+        s"(${p.name.value}: ${p.decltpe.map(_.toString()).getOrElse("?")})"
+      ).getOrElse("")
+      buf += SymbolInfo("<extension>", SymbolKind.Extension, file, d.pos.startLine + 1, pkg, Nil, s"extension $recv")
+    case _ =>
+
+  def traverse(t: Tree): Unit =
+    visit(t)
+    t.children.foreach(traverse)
+
+  traverse(tree)
+  (buf.toList, bloom, imports)
+
+// ── Binary persistence ──────────────────────────────────────────────────────
+
+object IndexPersistence:
+  private val MAGIC = 0x53584458
+  private val VERSION: Byte = 3
+
+  def indexPath(workspace: Path): Path = workspace.resolve(".scalex").resolve("index.bin")
+
+  def save(workspace: Path, files: List[IndexedFile]): Unit =
+    val dir = workspace.resolve(".scalex")
+    if !Files.exists(dir) then Files.createDirectories(dir)
+
+    val stringTable = mutable.LinkedHashMap.empty[String, Int]
+    def intern(s: String): Int =
+      stringTable.getOrElseUpdate(s, stringTable.size)
+
+    files.foreach { f =>
+      intern(f.relativePath)
+      intern(f.oid)
+      f.symbols.foreach { s =>
+        intern(s.name)
+        intern(s.packageName)
+        intern(s.signature)
+        s.parents.foreach(intern)
+      }
+      f.imports.foreach(intern)
+    }
+
+    val out = DataOutputStream(BufferedOutputStream(Files.newOutputStream(indexPath(workspace)), 1 << 16))
+    try
+      out.writeInt(MAGIC)
+      out.writeByte(VERSION)
+
+      val strings = stringTable.keys.toArray
+      out.writeInt(strings.length)
+      strings.foreach(out.writeUTF)
+
+      out.writeInt(files.size)
+      files.foreach { f =>
+        out.writeInt(intern(f.relativePath))
+        out.writeInt(intern(f.oid))
+
+        out.writeShort(f.symbols.size)
+        f.symbols.foreach { s =>
+          out.writeInt(intern(s.name))
+          out.writeByte(s.kind.id)
+          out.writeInt(s.line)
+          out.writeInt(intern(s.packageName))
+          out.writeInt(intern(s.signature))
+          out.writeShort(s.parents.size)
+          s.parents.foreach(p => out.writeInt(intern(p)))
+        }
+
+        // Imports
+        out.writeShort(f.imports.size)
+        f.imports.foreach(i => out.writeInt(intern(i)))
+
+        // Bloom filter
+        val bloomBytes = java.io.ByteArrayOutputStream()
+        f.identifierBloom.writeTo(bloomBytes)
+        val ba = bloomBytes.toByteArray
+        out.writeInt(ba.length)
+        out.write(ba)
+      }
+    finally out.close()
+
+  def load(workspace: Path): Option[Map[String, IndexedFile]] =
+    val p = indexPath(workspace)
+    if !Files.exists(p) then return None
+
+    try
+      val in = DataInputStream(BufferedInputStream(Files.newInputStream(p), 1 << 16))
+      try
+        val magic = in.readInt()
+        if magic != MAGIC then return None
+        val version = in.readByte()
+        if version != VERSION then return None
+
+        val strCount = in.readInt()
+        val strings = Array.fill(strCount)(in.readUTF())
+
+        val fileCount = in.readInt()
+        val result = mutable.HashMap.empty[String, IndexedFile]
+
+        var fi = 0
+        while fi < fileCount do
+          val relPath = strings(in.readInt())
+          val oid = strings(in.readInt())
+
+          val symCount = in.readShort()
+          val syms = List.newBuilder[SymbolInfo]
+          var si = 0
+          while si < symCount do
+            val name = strings(in.readInt())
+            val kind = SymbolKind.fromId(in.readByte())
+            val line = in.readInt()
+            val pkg = strings(in.readInt())
+            val sig = strings(in.readInt())
+            val parentCount = in.readShort()
+            val parents = (0 until parentCount).map(_ => strings(in.readInt())).toList
+            syms += SymbolInfo(name, kind, workspace.resolve(relPath), line, pkg, parents, sig)
+            si += 1
+
+          // Imports
+          val importCount = in.readShort()
+          val imports = (0 until importCount).map(_ => strings(in.readInt())).toList
+
+          // Bloom filter
+          val bloomLen = in.readInt()
+          val bloomBytes = new Array[Byte](bloomLen)
+          in.readFully(bloomBytes)
+          val bloom = BloomFilter.readFrom(
+            java.io.ByteArrayInputStream(bloomBytes),
+            Funnels.unencodedCharsFunnel()
+          )
+
+          result(relPath) = IndexedFile(relPath, oid, syms.result(), bloom, imports)
+          fi += 1
+
+        Some(result.toMap)
+      finally in.close()
+    catch
+      case _: Exception => None
+
+// ── Workspace index ─────────────────────────────────────────────────────────
+
+class WorkspaceIndex(val workspace: Path):
+  var symbols: List[SymbolInfo] = Nil
+  var filesByPath: Map[Path, List[SymbolInfo]] = Map.empty
+  var symbolsByName: Map[String, List[SymbolInfo]] = Map.empty
+  var packages: Set[String] = Set.empty
+  var gitFiles: List[GitFile] = Nil
+  private var indexedFiles: List[IndexedFile] = Nil
+  private var parentIndex: Map[String, List[SymbolInfo]] = Map.empty
+
+  var fileCount: Int = 0
+  var indexTimeMs: Long = 0
+  var parsedCount: Int = 0
+  var skippedCount: Int = 0
+  var parseFailures: Int = 0
+  var cachedLoad: Boolean = false
+
+  def index(): Unit =
+    val t0 = System.nanoTime()
+    gitFiles = gitLsFiles(workspace)
+    fileCount = gitFiles.size
+
+    val cached = IndexPersistence.load(workspace)
+    val result = mutable.ListBuffer.empty[IndexedFile]
+
+    cached match
+      case Some(cachedMap) =>
+        cachedLoad = true
+        val toParseQueue = ConcurrentLinkedQueue[IndexedFile]()
+        val toParse = mutable.ListBuffer.empty[GitFile]
+
+        gitFiles.foreach { gf =>
+          val rel = workspace.relativize(gf.path).toString
+          cachedMap.get(rel) match
+            case Some(cf) if cf.oid == gf.oid =>
+              result += cf
+              skippedCount += 1
+            case _ =>
+              toParse += gf
+        }
+
+        toParse.asJava.parallelStream().forEach { gf =>
+          val rel = workspace.relativize(gf.path).toString
+          val (syms, bloom, imports) = extractSymbols(gf.path)
+          toParseQueue.add(IndexedFile(rel, gf.oid, syms, bloom, imports))
+        }
+        result ++= toParseQueue.asScala
+        parsedCount = toParse.size
+
+      case None =>
+        val queue = ConcurrentLinkedQueue[IndexedFile]()
+        gitFiles.asJava.parallelStream().forEach { gf =>
+          val rel = workspace.relativize(gf.path).toString
+          val (syms, bloom, imports) = extractSymbols(gf.path)
+          queue.add(IndexedFile(rel, gf.oid, syms, bloom, imports))
+        }
+        result ++= queue.asScala
+        parsedCount = gitFiles.size
+
+    indexedFiles = result.toList
+    parseFailures = indexedFiles.count(f => f.symbols.isEmpty && {
+      val p = workspace.resolve(f.relativePath)
+      try Files.size(p) > 0 catch case _: Exception => false
+    })
+    symbols = indexedFiles.flatMap(_.symbols)
+    filesByPath = symbols.groupBy(_.file)
+    symbolsByName = symbols.groupBy(_.name.toLowerCase)
+    packages = symbols.map(_.packageName).filter(_.nonEmpty).toSet
+    // Build parent → children index for impl command
+    val pIdx = mutable.HashMap.empty[String, mutable.ListBuffer[SymbolInfo]]
+    symbols.foreach { s =>
+      s.parents.foreach { p =>
+        pIdx.getOrElseUpdate(p.toLowerCase, mutable.ListBuffer.empty) += s
+      }
+    }
+    parentIndex = pIdx.map((k, v) => k -> v.toList).toMap
+    indexTimeMs = (System.nanoTime() - t0) / 1_000_000
+
+    IndexPersistence.save(workspace, indexedFiles)
+
+  def findDefinition(name: String): List[SymbolInfo] =
+    symbolsByName.getOrElse(name.toLowerCase, Nil)
+
+  def findImplementations(name: String): List[SymbolInfo] =
+    parentIndex.getOrElse(name.toLowerCase, Nil)
+
+  def search(query: String): List[SymbolInfo] =
+    val lower = query.toLowerCase
+    val exact = mutable.ListBuffer.empty[SymbolInfo]
+    val prefix = mutable.ListBuffer.empty[SymbolInfo]
+    val contains = mutable.ListBuffer.empty[SymbolInfo]
+
+    symbols.distinctBy(s => (s.name, s.file, s.line)).foreach { s =>
+      val n = s.name.toLowerCase
+      if n == lower then exact += s
+      else if n.startsWith(lower) then prefix += s
+      else if n.contains(lower) then contains += s
+    }
+    exact.toList ++ prefix.toList ++ contains.toList
+
+  def fileSymbols(path: String): List[SymbolInfo] =
+    val resolved = if Path.of(path).isAbsolute then Path.of(path)
+                   else workspace.resolve(path)
+    filesByPath.getOrElse(resolved, Nil)
+
+  private val defaultTimeoutMs = 20_000L
+  var timedOut: Boolean = false
+
+  def findReferences(name: String, timeoutMs: Long = defaultTimeoutMs): List[Reference] =
+    val candidates = indexedFiles.filter(_.identifierBloom.mightContain(name))
+    val deadline = System.nanoTime() + timeoutMs * 1_000_000
+    timedOut = false
+    val results = ConcurrentLinkedQueue[Reference]()
+    candidates.asJava.parallelStream().forEach { idxFile =>
+      if System.nanoTime() < deadline then
+        val path = workspace.resolve(idxFile.relativePath)
+        val lines = try Files.readAllLines(path).asScala catch
+          case _: Exception => Seq.empty
+        lines.zipWithIndex.foreach {
+          case (line, idx) if System.nanoTime() < deadline && containsWord(line, name) =>
+            results.add(Reference(path, idx + 1, line.trim))
+          case _ =>
+        }
+      else timedOut = true
+    }
+    results.asScala.toList
+
+  def categorizeReferences(name: String): Map[RefCategory, List[Reference]] =
+    val refs = findReferences(name)
+    refs.groupBy { r =>
+      val line = r.contextLine
+      if line.matches("""^\s*(trait|class|object|enum|given|type|def|val|var)\s+.*""") && containsWord(line, name) &&
+         (line.contains(s"trait $name") || line.contains(s"class $name") || line.contains(s"object $name") ||
+          line.contains(s"enum $name") || line.contains(s"type $name") ||
+          line.matches(s""".*given\\s+\\w*$name.*""")) then
+        RefCategory.Definition
+      else if line.matches(""".*\b(extends|with)\b.*""") && containsWord(line, name) then
+        RefCategory.ExtendedBy
+      else if line.trim.startsWith("import ") then
+        RefCategory.ImportedBy
+      else if line.matches("""^\s*(//|/\*|\*).*""") then
+        RefCategory.Comment
+      else if line.matches(s""".*:\\s*$name.*""") || line.matches(s""".*\\[$name.*""") then
+        RefCategory.UsedAsType
+      else
+        RefCategory.Usage
+    }
+
+  def findImports(name: String, timeoutMs: Long = defaultTimeoutMs): List[Reference] =
+    val candidates = indexedFiles.filter(_.identifierBloom.mightContain(name))
+    val deadline = System.nanoTime() + timeoutMs * 1_000_000
+    timedOut = false
+    val results = ConcurrentLinkedQueue[Reference]()
+    candidates.asJava.parallelStream().forEach { idxFile =>
+      if System.nanoTime() < deadline then
+        val path = workspace.resolve(idxFile.relativePath)
+        val lines = try Files.readAllLines(path).asScala catch
+          case _: Exception => Seq.empty
+        lines.zipWithIndex.foreach {
+          case (line, idx) if System.nanoTime() < deadline && line.trim.startsWith("import ") && containsWord(line, name) =>
+            results.add(Reference(path, idx + 1, line.trim))
+          case _ =>
+        }
+      else timedOut = true
+    }
+    results.asScala.toList
+
+  private def containsWord(line: String, word: String): Boolean =
+    var i = line.indexOf(word)
+    while i >= 0 do
+      val before = i == 0 || !line(i - 1).isLetterOrDigit
+      val after = i + word.length >= line.length || !line(i + word.length).isLetterOrDigit
+      if before && after then return true
+      i = line.indexOf(word, i + 1)
+    false
+
+// ── CLI ─────────────────────────────────────────────────────────────────────
+
+def formatSymbol(s: SymbolInfo, workspace: Path): String =
+  val rel = workspace.relativize(s.file)
+  val pkg = if s.packageName.nonEmpty then s" (${s.packageName})" else ""
+  s"  ${s.kind.toString.toLowerCase.padTo(9, ' ')} ${s.name}$pkg — $rel:${s.line}"
+
+def formatSymbolVerbose(s: SymbolInfo, workspace: Path): String =
+  val rel = workspace.relativize(s.file)
+  val pkg = if s.packageName.nonEmpty then s" (${s.packageName})" else ""
+  val sig = if s.signature.nonEmpty then s"\n             ${s.signature}" else ""
+  s"  ${s.kind.toString.toLowerCase.padTo(9, ' ')} ${s.name}$pkg — $rel:${s.line}$sig"
+
+def formatRef(r: Reference, workspace: Path): String =
+  val rel = workspace.relativize(r.file)
+  s"  $rel:${r.line} — ${r.contextLine}"
+
+def printNotFoundHint(symbol: String, idx: WorkspaceIndex, cmd: String): Unit =
+  println(s"  Hint: scalex indexes ${idx.fileCount} git-tracked .scala files.")
+  if idx.parseFailures > 0 then
+    println(s"  ${idx.parseFailures} files had parse errors and may be missing symbols.")
+  println(s"  Fallback: use Grep, Glob, or Read tools to search manually.")
+
+def resolveWorkspace(path: String): Path =
+  val p = Path.of(path).toAbsolutePath.normalize
+  if Files.isDirectory(p) then p else p.getParent
+
+def parseWorkspaceAndArg(rest: List[String]): Option[(Path, String)] =
+  rest match
+    case a :: Nil => Some((resolveWorkspace("."), a))
+    case ws :: a :: _ => Some((resolveWorkspace(ws), a))
+    case _ => None
+
+def runCommand(cmd: String, rest: List[String], idx: WorkspaceIndex, workspace: Path,
+               limit: Int, kindFilter: Option[String], verbose: Boolean, categorize: Boolean): Unit =
+  val fmt = if verbose then formatSymbolVerbose else formatSymbol
+  cmd match
+    case "index" =>
+      if idx.cachedLoad then
+        println(s"Indexed ${idx.fileCount} files (${idx.skippedCount} cached, ${idx.parsedCount} parsed) in ${idx.indexTimeMs}ms")
+      else
+        println(s"Indexed ${idx.fileCount} files, ${idx.symbols.size} symbols in ${idx.indexTimeMs}ms")
+      println(s"Packages: ${idx.packages.size}")
+      println()
+      println("Symbols by kind:")
+      idx.symbols.groupBy(_.kind).toList.sortBy(-_._2.size).foreach { (kind, syms) =>
+        println(s"  ${kind.toString.padTo(10, ' ')} ${syms.size}")
+      }
+
+    case "search" =>
+      rest.headOption match
+        case None => println("Usage: scalex search <query>")
+        case Some(query) =>
+          var results = idx.search(query)
+          kindFilter.foreach { k =>
+            val kk = k.toLowerCase
+            results = results.filter(_.kind.toString.toLowerCase == kk)
+          }
+          if results.isEmpty then
+            println(s"Found 0 symbols matching \"$query\"")
+            printNotFoundHint(query, idx, "search")
+          else
+            println(s"Found ${results.size} symbols matching \"$query\":")
+            results.take(limit).foreach(s => println(fmt(s, workspace)))
+            if results.size > limit then println(s"  ... and ${results.size - limit} more")
+
+    case "def" =>
+      rest.headOption match
+        case None => println("Usage: scalex def <symbol>")
+        case Some(symbol) =>
+          val results = idx.findDefinition(symbol)
+          if results.isEmpty then
+            println(s"Definition of \"$symbol\": not found")
+            printNotFoundHint(symbol, idx, "def")
+          else
+            println(s"Definition of \"$symbol\":")
+            results.foreach(s => println(fmt(s, workspace)))
+
+    case "impl" =>
+      rest.headOption match
+        case None => println("Usage: scalex impl <trait>")
+        case Some(symbol) =>
+          val results = idx.findImplementations(symbol)
+          if results.isEmpty then
+            println(s"No implementations of \"$symbol\" found")
+            printNotFoundHint(symbol, idx, "impl")
+          else
+            println(s"Implementations of \"$symbol\" — ${results.size} found:")
+            results.take(limit).foreach(s => println(fmt(s, workspace)))
+            if results.size > limit then println(s"  ... and ${results.size - limit} more")
+
+    case "refs" =>
+      rest.headOption match
+        case None => println("Usage: scalex refs <symbol>")
+        case Some(symbol) =>
+          if categorize then
+            val grouped = idx.categorizeReferences(symbol)
+            val total = grouped.values.map(_.size).sum
+            val suffix = if idx.timedOut then " (timed out — partial results)" else ""
+            println(s"References to \"$symbol\" — $total found:$suffix")
+            val order = List(RefCategory.Definition, RefCategory.ExtendedBy, RefCategory.ImportedBy,
+                             RefCategory.UsedAsType, RefCategory.Usage, RefCategory.Comment)
+            order.foreach { cat =>
+              grouped.get(cat).filter(_.nonEmpty).foreach { refs =>
+                println(s"\n  ${cat.toString}:")
+                refs.take(limit).foreach(r => println(s"  ${formatRef(r, workspace)}"))
+                if refs.size > limit then println(s"    ... and ${refs.size - limit} more")
+              }
+            }
+          else
+            val results = idx.findReferences(symbol)
+            val suffix = if idx.timedOut then " (timed out — partial results)" else ""
+            println(s"References to \"$symbol\" — ${results.size} found:$suffix")
+            results.take(limit).foreach(r => println(formatRef(r, workspace)))
+            if results.size > limit then println(s"  ... and ${results.size - limit} more")
+
+    case "imports" =>
+      rest.headOption match
+        case None => println("Usage: scalex imports <symbol>")
+        case Some(symbol) =>
+          val results = idx.findImports(symbol)
+          if results.isEmpty then
+            println(s"No imports of \"$symbol\" found")
+            printNotFoundHint(symbol, idx, "imports")
+          else
+            val suffix = if idx.timedOut then " (timed out — partial results)" else ""
+            println(s"Imports of \"$symbol\" — ${results.size} found:$suffix")
+            results.take(limit).foreach(r => println(formatRef(r, workspace)))
+            if results.size > limit then println(s"  ... and ${results.size - limit} more")
+
+    case "symbols" =>
+      rest.headOption match
+        case None => println("Usage: scalex symbols <file>")
+        case Some(file) =>
+          val results = idx.fileSymbols(file)
+          if results.isEmpty then println(s"No symbols found in $file")
+          else
+            println(s"Symbols in $file:")
+            results.foreach(s => println(fmt(s, workspace)))
+
+    case "packages" =>
+      println(s"Packages (${idx.packages.size}):")
+      idx.packages.toList.sorted.foreach(p => println(s"  $p"))
+
+    case other =>
+      println(s"Unknown command: $other")
+
+@main def main(args: String*): Unit =
+  val argList = args.toList
+
+  if argList.contains("--version") then
+    println(ScalexVersion)
+    return
+
+  val limit = argList.indexOf("--limit") match
+    case -1 => 20
+    case i => argList.lift(i + 1).flatMap(_.toIntOption).getOrElse(20)
+  val kindFilter = argList.indexOf("--kind") match
+    case -1 => None
+    case i => argList.lift(i + 1)
+  val verbose = argList.contains("--verbose")
+  val categorize = argList.contains("--categorize")
+
+  val cleanArgs = argList.filterNot(a => a.startsWith("--") || {
+    val prev = argList.indexOf(a) - 1
+    prev >= 0 && (argList(prev) == "--limit" || argList(prev) == "--kind")
+  })
+
+  cleanArgs match
+    case Nil | List("help") =>
+      println("""Scalex — Scala code intelligence for AI agents
+        |
+        |Commands:
+        |  scalex search <query>           Search symbols by name          (aka: find symbol)
+        |  scalex def <symbol>             Where is this symbol defined?   (aka: find definition)
+        |  scalex impl <trait>             Who extends this trait/class?   (aka: find implementations)
+        |  scalex refs <symbol>            Who uses this symbol?           (aka: find references)
+        |  scalex imports <symbol>         Who imports this symbol?        (aka: import graph)
+        |  scalex symbols <file>           What's defined in this file?    (aka: file symbols)
+        |  scalex packages                 What packages exist?            (aka: list packages)
+        |  scalex index                    Rebuild the index               (aka: reindex)
+        |  scalex batch                    Run multiple queries at once    (aka: batch mode)
+        |
+        |Options:
+        |  --limit N       Max results (default: 20)
+        |  --kind K        Filter by kind: class, trait, object, def, val, type, enum, given, extension
+        |  --verbose       Show signatures and extends clauses
+        |  --categorize    Group refs by: definition, extends, import, type usage, comment
+        |  --version       Print version and exit
+        |
+        |All commands accept an optional [workspace] path (default: current directory).
+        |First run indexes the project (~3s for 14k files). Subsequent runs use cache (~300ms).
+        |""".stripMargin)
+
+    case "batch" :: rest =>
+      val workspace = resolveWorkspace(rest.headOption.getOrElse("."))
+      val idx = WorkspaceIndex(workspace)
+      idx.index()
+      val reader = BufferedReader(InputStreamReader(System.in))
+      var line = reader.readLine()
+      while line != null do
+        val parts = line.trim.split("\\s+").toList
+        if parts.nonEmpty && parts.head.nonEmpty then
+          val batchCmd = parts.head
+          val batchRest = parts.tail
+          println(s">>> $line")
+          runCommand(batchCmd, batchRest, idx, workspace, limit, kindFilter, verbose, categorize)
+          println()
+        line = reader.readLine()
+
+    case cmd :: rest =>
+      val (workspace, cmdRest) = cmd match
+        case "index" | "packages" =>
+          (resolveWorkspace(rest.headOption.getOrElse(".")), rest)
+        case _ =>
+          rest match
+            case arg :: Nil => (resolveWorkspace("."), List(arg))
+            case ws :: arg :: tail => (resolveWorkspace(ws), arg :: tail)
+            case Nil => (resolveWorkspace("."), Nil)
+
+      val idx = WorkspaceIndex(workspace)
+      idx.index()
+      runCommand(cmd, cmdRest, idx, workspace, limit, kindFilter, verbose, categorize)
