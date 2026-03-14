@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 import com.google.common.hash.{BloomFilter, Funnels}
 
+val ScalexVersion = "1.0.0"
+
 // ── Data types ──────────────────────────────────────────────────────────────
 
 enum SymbolKind(val id: Byte):
@@ -648,6 +650,10 @@ def runCommand(cmd: String, rest: List[String], idx: WorkspaceIndex, workspace: 
 
 @main def main(args: String*): Unit =
   val argList = args.toList
+
+  if argList.contains("--version") then
+    println(ScalexVersion)
+    return
 
   val limit = argList.indexOf("--limit") match
     case -1 => 20

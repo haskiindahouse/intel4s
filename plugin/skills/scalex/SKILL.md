@@ -3,16 +3,18 @@ name: scalex
 description: Scala code intelligence CLI for navigating Scala 3 codebases. Use this skill whenever you're working in a project with .scala files and need to understand code structure — finding where a class/trait/object is defined, who extends a trait, who uses or imports a symbol, what's in a file, or exploring packages. Trigger on any Scala navigation task like "where is X defined", "who implements Y", "find usages of Z", "what traits exist", or when you need to understand impact before renaming/refactoring. Also use proactively when exploring an unfamiliar Scala codebase — scalex is much faster and more structured than grep for Scala-specific queries. Always prefer scalex over grep/glob for Scala symbol lookups.
 ---
 
-You have access to `scalex`, a Scala code intelligence CLI that understands Scala 3 syntax (classes, traits, objects, enums, givens, extensions, type aliases). It parses source files via Scalameta and builds a persistent index — no compiler or build server needed.
+You have access to `scalex`, a Scala code intelligence CLI that understands Scala syntax (classes, traits, objects, enums, givens, extensions, type aliases, defs, vals). It parses source files via Scalameta — no compiler or build server needed. Works with both Scala 3 and Scala 2 files (tries Scala 3 dialect first, falls back to Scala 2.13).
 
-First run on a project takes ~3s to index. After that, queries run in ~300ms because unchanged files are skipped via git OID caching.
+First run on a project indexes all git-tracked `.scala` files (~3s for 14k files). Subsequent runs use OID-based caching and only re-parse changed files (~300ms).
 
 ## Setup
 
-Before first use, check if scalex is available and install if needed. Install to `~/.local/bin` (no sudo required):
+Before first use, check if scalex is installed and at the expected version. Install or update to `~/.local/bin` (no sudo required):
 
 ```bash
-which scalex || {
+EXPECTED_VERSION="1.0.0"
+INSTALLED_VERSION=$(scalex --version 2>/dev/null || echo "none")
+if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ]; then
   mkdir -p ~/.local/bin
   OS="$(uname -s)"; ARCH="$(uname -m)"
   case "$OS-$ARCH" in
@@ -20,12 +22,18 @@ which scalex || {
     Darwin-x86_64) ARTIFACT="scalex-macos-x64" ;;
     Linux-x86_64)  ARTIFACT="scalex-linux-x64" ;;
   esac
-  curl -fsSL "https://github.com/nguyenyou/scalex/releases/latest/download/$ARTIFACT" -o ~/.local/bin/scalex
+  curl -fsSL "https://github.com/nguyenyou/scalex/releases/download/v${EXPECTED_VERSION}/${ARTIFACT}" -o ~/.local/bin/scalex
   chmod +x ~/.local/bin/scalex
-}
+fi
 ```
 
 If `scalex` is still not found after install (not on PATH), use the full path: `~/.local/bin/scalex` instead of `scalex` for all commands below.
+
+## What scalex indexes
+
+Scalex extracts **top-level declarations** from every git-tracked `.scala` file: classes, traits, objects, enums, defs, vals, types, givens (named only — anonymous givens are skipped), and extension groups. It does NOT index local definitions inside method bodies, method parameters, or pattern bindings.
+
+The `refs`, `imports`, and `categorize` features work differently — they do text search with word-boundary matching across files, so they find ALL textual occurrences regardless of whether the symbol is in the index.
 
 ## Commands
 
@@ -47,7 +55,7 @@ scalex def PaymentService --verbose
 
 ### `scalex impl <trait> [--verbose] [--limit N]` — find implementations
 
-Finds all classes/objects/enums that extend or mix in a trait. Much more targeted than `refs` when you need to find concrete implementations.
+Finds all classes/objects/enums that extend or mix in a trait. Uses the index directly — much faster and more targeted than `refs` when you specifically need concrete implementations.
 
 ```bash
 scalex impl PaymentService --verbose
@@ -59,7 +67,9 @@ scalex impl PaymentService --verbose
 
 ### `scalex refs <symbol> [--categorize] [--limit N]` — find references
 
-Finds all usages of a symbol with word-boundary matching. Use `--categorize` before refactoring — it groups results into Definition, ExtendedBy, ImportedBy, UsedAsType, Usage, and Comment so you can understand impact at a glance.
+Finds all usages of a symbol using word-boundary text matching. Uses bloom filters to skip files that definitely don't contain the symbol, then reads candidate files. Has a 20-second timeout — on very large codebases with a common symbol, output may say "(timed out — partial results)".
+
+Use `--categorize` before refactoring — it groups results into Definition, ExtendedBy, ImportedBy, UsedAsType, Usage, and Comment so you can understand impact at a glance.
 
 ```bash
 scalex refs PaymentService --categorize
@@ -81,7 +91,7 @@ Without `--categorize`, returns a flat list (faster for simple lookups).
 
 ### `scalex imports <symbol> [--limit N]` — import graph
 
-Returns only import statements for a symbol. Use when you need to know which files depend on something — cleaner than `refs` for dependency analysis.
+Returns only import statements for a symbol. Use when you need to know which files depend on something — cleaner than `refs` for dependency analysis. Also has a 20-second timeout.
 
 ```bash
 scalex imports PaymentService
@@ -89,7 +99,7 @@ scalex imports PaymentService
 
 ### `scalex search <query> [--kind K] [--verbose] [--limit N]` — search symbols
 
-Fuzzy search by name, ranked: exact → prefix → contains. Use `--kind` to filter by symbol type (class, trait, object, def, val, type, enum, given).
+Fuzzy search by name, ranked: exact > prefix > contains. Use `--kind` to filter by symbol type.
 
 ```bash
 scalex search Service --kind trait --limit 10
@@ -111,7 +121,7 @@ scalex packages
 
 ### `scalex batch` — multiple queries, one index load
 
-Reads queries from stdin, loads index once. Use when you need several lookups — runs 5 queries in ~1s instead of ~5s.
+Reads queries from stdin, loads index once. Use when you need several lookups — avoids re-loading the index for each command. 5 queries in ~1s instead of ~5s.
 
 ```bash
 echo -e "def UserService\nimpl UserService\nimports UserService" | scalex batch
@@ -119,7 +129,7 @@ echo -e "def UserService\nimpl UserService\nimports UserService" | scalex batch
 
 ### `scalex index` — force reindex
 
-Normally not needed — every command auto-reindexes. Use after major branch switches or large merges.
+Normally not needed — every command auto-reindexes changed files. Use after major branch switches or large merges to get a clean reindex.
 
 ## Options
 
@@ -128,8 +138,28 @@ Normally not needed — every command auto-reindexes. Use after major branch swi
 | `--verbose` | Show signatures, extends clauses, param types |
 | `--categorize` | Group refs into Definition/ExtendedBy/ImportedBy/UsedAsType/Comment/Usage |
 | `--limit N` | Max results (default: 20) |
-| `--kind K` | Filter search: class, trait, object, def, val, type, enum, given |
+| `--kind K` | Filter search: class, trait, object, def, val, type, enum, given, extension |
+
+## Common workflows
+
+**"Where is X defined?"** → `scalex def X --verbose`
+
+**"Who implements trait X?"** → `scalex impl X` (index-based, fast)
+
+**"What's the impact of renaming X?"** → `scalex refs X --categorize` (shows all usages grouped by kind)
+
+**"Which files import X?"** → `scalex imports X` (just import lines, clean for dependency analysis)
+
+**"What traits/classes exist named like X?"** → `scalex search X --kind trait`
+
+**"What's in this file?"** → `scalex symbols path/to/File.scala --verbose`
+
+**"I need to look up 3+ symbols"** → use `batch` to avoid repeated index loads
+
+## Fallback
+
+If scalex returns "not found", the symbol might be a local definition (not top-level), in a file with parse errors, or not git-tracked. Fall back to Grep/Glob/Read for manual search.
 
 ## Why scalex over grep
 
-scalex understands Scala 3 syntax. It finds `given` definitions, `enum` declarations, and `extension` groups that grep patterns miss. It returns structured output with symbol kind, package name, and line numbers. For any Scala-specific navigation, prefer scalex — it's purpose-built for exactly this.
+scalex understands Scala syntax. It finds `given` definitions, `enum` declarations, and `extension` groups that grep patterns miss. It returns structured output with symbol kind, package name, and line numbers. `--categorize` provides refactoring-ready impact analysis that would require multiple grep passes. For any Scala-specific navigation, prefer scalex — it's purpose-built for exactly this.
