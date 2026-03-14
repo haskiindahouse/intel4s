@@ -5,6 +5,6 @@
     "name": "Tu Nguyen"
   },
   "repository": "https://github.com/nguyenyou/scalex",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "keywords": ["scala", "code-intelligence", "search", "navigation"]
 }
