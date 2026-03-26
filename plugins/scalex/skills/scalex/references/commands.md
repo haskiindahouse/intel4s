@@ -292,6 +292,10 @@ echo -e "def UserService\ngrep processPayment\nimpl UserService" | scalex batch 
 
 Normally not needed — every command auto-reindexes changed files. Use after major branch switches or large merges to get a clean reindex.
 
+### `scalex mcp` — MCP server mode
+
+Starts a persistent MCP (Model Context Protocol) server over STDIO. Exposes all scalex commands as MCP tools (`scalex_search`, `scalex_def`, `scalex_refs`, etc.) for integration with Cursor, Windsurf, Cline, and any MCP-compatible tool. The index is cached in memory between tool calls for faster response times.
+
 ---
 
 ## Options

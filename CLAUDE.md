@@ -29,6 +29,12 @@ scala-cli run src/ -- <command> [args...]
 # Run tests
 scala-cli test src/ tests/
 
+# Run a single test suite
+scala-cli test src/ tests/ --test-only 'ExtractionSuite'
+
+# Run a single test by name substring
+scala-cli test src/ tests/ -- '*keyword*'
+
 # Build GraalVM native image (requires GraalVM + scala-cli)
 ./build-native.sh
 # Output: ./scalex (26MB standalone binary)

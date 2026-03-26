@@ -239,6 +239,7 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  scalex entrypoints              Find @main, def main, extends App, test suites
         |  scalex graph --render "A->B"    Render directed graph as ASCII/Unicode art
         |  scalex graph --parse            Parse ASCII diagram from stdin into boxes+edges
+        |  scalex mcp                      Start MCP server (JSON-RPC over stdio)
         |
         |Options:
         |  -w, --workspace PATH  Set workspace path (default: current directory)
@@ -326,6 +327,9 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
           Timings.report()
           println()
         line = reader.readLine()
+
+    case "mcp" :: _ =>
+      McpServer.run()
 
     case "graph" :: _ =>
       // graph command doesn't need workspace index — extract raw args after "graph", strip global flags

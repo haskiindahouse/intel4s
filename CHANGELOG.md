@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `mcp` — MCP (Model Context Protocol) server mode over STDIO; exposes all 29 scalex commands as MCP tools (`scalex_search`, `scalex_def`, `scalex_refs`, etc.); enables integration with Cursor, Windsurf, Cline, and any MCP-compatible coding tool; in-memory index caching between tool calls for faster response times
+
 ## [1.38.0] — 2026-03-22
 
 ### Fixed

@@ -4,6 +4,14 @@
 
 - [ ] Publish plugin to Claude Code marketplace
 
+### MCP server — use scalex from Cursor, Windsurf, Cline, and any MCP-compatible tool
+
+- [x] `scalex mcp` subcommand — starts a persistent MCP server over STDIO (JSON-RPC 2.0)
+- [x] One MCP tool per command (`scalex_search`, `scalex_def`, `scalex_refs`, etc.) — 29 tools total
+- [x] In-memory index caching between tool calls — avoids re-loading index on each invocation
+- [x] Minimal built-in JSON parser (`McpJson` enum) — no new dependencies
+- [x] Configuration examples for Cursor, Windsurf, Cline in README
+
 ### Community feedback: output budgets & package-scoped refs (#252)
 
 - [x] `--max-output N` global output budget — truncate any command's output at N characters with pagination hint; wraps `render()` centrally via `BudgetPrintStream` in `runCommand`; also serves as per-query budget in `batch` mode

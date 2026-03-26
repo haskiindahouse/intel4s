@@ -97,7 +97,7 @@ Here's the architecture (generated with `scalex graph --render`):
  └─────────────┘ └─────────────────┘ └────────────┘
 ```
 
-- **scalex CLI** — 30 commands: search, def, impl, refs, imports, members, graph, ...
+- **scalex CLI** — 31 commands: search, def, impl, refs, imports, members, graph, mcp, ...
 - **WorkspaceIndex** — lazy indexes: symbolsByName, parentIndex, filesByPath, bloom filters
 - **git ls-files** — `--stage` returns path + OID per tracked file (change detection)
 - **Scalameta AST** — Source → AST → SymbolInfo, BloomFilter, imports, parents
@@ -147,6 +147,40 @@ Installs the binary + skill (teaches Claude when and how to use scalex) in one s
 Then try:
 
 > *"use scalex to explore how authentication works in this codebase"*
+
+### MCP server (Cursor, Windsurf, Cline, and others)
+
+Scalex includes a built-in MCP server that exposes all commands as tools over STDIO. This works with any tool that supports the [Model Context Protocol](https://modelcontextprotocol.io/).
+
+Add to your MCP configuration (e.g. `.cursor/mcp.json`, `~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "scalex": {
+      "type": "stdio",
+      "command": "/path/to/scalex",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Or run from source without building a native image:
+
+```json
+{
+  "mcpServers": {
+    "scalex": {
+      "type": "stdio",
+      "command": "scala-cli",
+      "args": ["run", "/path/to/scalex/src/", "--power", "--", "mcp"]
+    }
+  }
+}
+```
+
+The MCP server keeps the index in memory between tool calls — no re-loading on each invocation. Each scalex command becomes an MCP tool (e.g. `scalex_search`, `scalex_def`, `scalex_refs`). All tools accept `workspace` (project root path), `query` (for commands that need one), and `args` (additional CLI flags).
 
 ### Other coding agents
 
@@ -291,6 +325,7 @@ scalex summary <package>        Sub-packages with symbol counts   (aka: package 
 scalex entrypoints              Find @main, def main, extends App, test suites
 scalex graph --render "A->B"   Render directed graph as ASCII/Unicode art
 scalex graph --parse           Parse ASCII diagram from stdin into boxes+edges
+scalex mcp                     Start MCP server (JSON-RPC over stdio)
 ```
 
 All commands support `--json`, `--path PREFIX`, `--exclude-path PREFIX`, `--no-tests`, `--in-package PKG`, `--max-output N`, and `--limit N` (0 = unlimited). See the full [command reference and options](plugins/scalex/skills/scalex/SKILL.md) for detailed usage, examples, and all flags.
