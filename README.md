@@ -101,21 +101,27 @@ semanticdbEnabled := true
 
 Index stays in memory between tool calls. Every command becomes an MCP tool.
 
-### Claude Code
+### Claude Code (recommended)
 
 ```bash
-/plugin install intel4s
+/plugin marketplace add haskiindahouse/intel4s
+/plugin install intel4s@intel4s-marketplace
 ```
 
+Then ask:
+
 > *"use intel4s to explore how authentication works in this codebase"*
+
+The plugin installs the skill (teaches Claude when and how to use intel4s) and a bootstrap script that auto-downloads the native binary on first run.
 
 ### CLI
 
 ```bash
 # Build from source (scala-cli + GraalVM)
-./build-native.sh
+git clone https://github.com/haskiindahouse/intel4s.git
+cd intel4s && ./build-native.sh
 
-# Or run directly
+# Or run directly without building
 scala-cli run src/ -- search /path/to/project MyClass
 ```
 
