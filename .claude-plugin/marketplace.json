@@ -1,27 +1,27 @@
 {
-  "name": "scalex-marketplace",
+  "name": "intel4s-marketplace",
   "owner": {
-    "name": "Tu Nguyen"
+    "name": "haskiindahouse"
   },
   "metadata": {
-    "description": "Scala code intelligence tools for coding agents",
+    "description": "AI Scala agent with semantic rename, call-graph, dead code detection",
     "pluginRoot": "."
   },
   "plugins": [
     {
-      "name": "scalex",
+      "name": "intel4s",
       "source": "./plugins/scalex",
-      "description": "Scala code intelligence for coding agents — search symbols, find definitions, find implementations, find references, explore imports. Works on Scala 2 and 3 codebases without a compiler or build server.",
-      "version": "1.38.0",
+      "description": "Code intelligence for Scala. Semantic rename, call-graph, dead code detection, scaffolding. Works without a build server — type-aware when compiled. 36 commands, MCP native.",
+      "version": "0.1.0",
       "author": {
-        "name": "Tu Nguyen"
+        "name": "haskiindahouse"
       },
-      "homepage": "https://github.com/nguyenyou/scalex",
-      "repository": "https://github.com/nguyenyou/scalex",
+      "homepage": "https://haskiindahouse.github.io/intel4s/",
+      "repository": "https://github.com/haskiindahouse/intel4s",
       "license": "MIT",
-      "keywords": ["scala", "code-intelligence", "search", "navigation", "coding-agent"],
+      "keywords": ["scala", "code-intelligence", "ai-agent", "semantic-rename", "call-graph", "mcp"],
       "category": "code-intelligence",
-      "tags": ["scala", "scala3", "navigation", "find-definition", "find-references"]
+      "tags": ["scala", "scala3", "semanticdb", "rename", "dead-code", "call-graph", "scaffolding"]
     }
   ]
 }
