@@ -1,10 +1,11 @@
 {
-  "name": "scalex",
-  "description": "Scala code intelligence for coding agents — fast symbol search, find definitions, and find references",
+  "name": "intel4s",
+  "version": "0.1.0",
+  "description": "Code intelligence for Scala — semantic rename, call-graph, dead code detection, scaffolding. Works without a build, type-aware when compiled.",
   "author": {
-    "name": "Tu Nguyen"
+    "name": "haskiindahouse"
   },
-  "repository": "https://github.com/nguyenyou/scalex",
+  "repository": "https://github.com/haskiindahouse/intel4s",
   "license": "MIT",
-  "keywords": ["scala", "code-intelligence", "search", "navigation"]
+  "keywords": ["scala", "code-intelligence", "ai-agent", "semantic-rename", "call-graph", "mcp"]
 }
