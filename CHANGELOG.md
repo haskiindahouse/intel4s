@@ -2,6 +2,17 @@
 
 All notable changes to intel4s are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`/intel4s:setup` skill** — one-time project onboarding; detects build tool, runs scalex overview, writes Scala Code Intelligence section to CLAUDE.md with available skills, SemanticDB status, and usage guidance
+- **`/intel4s:semanticdb` skill** — enables SemanticDB in build config (sbt/mill/scala-cli/gradle); detects Scala version, applies the right setting, compiles, and verifies `.semanticdb` files were generated
+- **`/intel4s:upgrade` skill** — upgrades scalex binary to latest GitHub release; clears cache and re-downloads
+- **`/intel4s:doctor` skill** — diagnostic check: binary version, index health, SemanticDB availability, CLAUDE.md configuration, macOS quarantine
+- **`scala-expert` agent** — auto-invoked by Claude for complex multi-step Scala tasks (refactoring, impact analysis, codebase exploration); chains 3+ scalex commands using built-in workflow recipes
+- Extracted shared workflow recipes to `references/workflows.md` — single source of truth for SKILL.md and scala-expert agent
+
 ## [0.1.0] — 2026-03-27
 
 First release. Built on [scalex](https://github.com/nguyenyou/scalex) v1.38.0 with six new features.
