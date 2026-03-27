@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="site/vulture.png" alt="intel4s" width="256">
+  <img src="docs/vulture.png" alt="intel4s" width="256">
   <br>
   <strong style="font-size: 2.5em;">intel4s</strong>
   <br><br>
