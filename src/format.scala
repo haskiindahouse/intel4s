@@ -114,6 +114,10 @@ def render(result: CmdResult, ctx: CommandContext): Unit = {
     case r: RefsSummary      => renderRefsSummary(r, ctx)
     case r: Entrypoints      => renderEntrypoints(r, ctx)
     case r: GraphOutput      => println(r.text)
+    case r: RenameResult     => renderRenameResult(r, ctx)
+    case r: CallGraph        => renderCallGraph(r, ctx)
+    case r: ScaffoldImpl     => renderScaffoldImpl(r, ctx)
+    case r: ScaffoldTest     => renderScaffoldTest(r, ctx)
     case r: NotFound         => renderNotFound(r, ctx)
     case r: UsageError       => println(r.message)
   }
@@ -1291,6 +1295,161 @@ private def renderEntrypoints(r: CmdResult.Entrypoints, ctx: CommandContext): Un
         }
       }
     }
+  }
+}
+
+private def renderRenameResult(r: CmdResult.RenameResult, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then {
+    val edits = r.edits.map { e =>
+      val rel = jsonEscape(ctx.workspace.relativize(e.file).toString)
+      s"""{"file":"$rel","line":${e.line},"category":"${e.category}","old":"${jsonEscape(e.oldLine)}","new":"${jsonEscape(e.newLine)}"}"""
+    }.mkString("[", ",", "]")
+    println(s"""{"from":"${jsonEscape(r.oldName)}","to":"${jsonEscape(r.newName)}","editCount":${r.edits.size},"edits":$edits}""")
+  } else {
+    if r.edits.isEmpty then
+      println(s"""No occurrences of "${r.oldName}" found to rename""")
+    else {
+      println(s"""Rename "${r.oldName}" → "${r.newName}" — ${r.edits.size} edits in ${r.edits.map(_.file).distinct.size} files:""")
+      println()
+      var lastFile: Path = null
+      r.edits.foreach { e =>
+        val rel = ctx.workspace.relativize(e.file)
+        if e.file != lastFile then {
+          if lastFile != null then println()
+          println(s"  $rel")
+          lastFile = e.file
+        }
+        println(s"    L${e.line} [${e.category}]  ${e.oldLine}")
+        println(s"    ${" " * (e.line.toString.length + 1)} →  ${e.newLine}")
+      }
+    }
+  }
+}
+
+private def renderCallGraph(r: CmdResult.CallGraph, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then {
+    val callees = r.callees.map { c =>
+      val file = c.file.map(f => s""""${jsonEscape(ctx.workspace.relativize(f).toString)}"""").getOrElse("null")
+      val line = c.line.map(_.toString).getOrElse("null")
+      s"""{"name":"${jsonEscape(c.name)}","kind":"${c.kind.toString.toLowerCase}","file":$file,"line":$line,"package":"${jsonEscape(c.packageName)}","signature":"${jsonEscape(c.signature)}"}"""
+    }.mkString("[", ",", "]")
+    val callers = r.callers.map(ref => {
+      val rel = jsonEscape(ctx.workspace.relativize(ref.file).toString)
+      s"""{"file":"$rel","line":${ref.line},"context":"${jsonEscape(ref.contextLine)}"}"""
+    }).mkString("[", ",", "]")
+    val relFile = jsonEscape(ctx.workspace.relativize(r.file).toString)
+    println(s"""{"method":"${jsonEscape(r.method)}","file":"$relFile","line":${r.line},"owner":"${jsonEscape(r.owner)}","callees":$callees,"callers":$callers}""")
+  } else {
+    val relFile = ctx.workspace.relativize(r.file)
+    val ownerPrefix = if r.owner.nonEmpty then s"${r.owner}." else ""
+    println(s"Call graph for $ownerPrefix${r.method} ($relFile:${r.line})")
+    println()
+    if r.callees.isEmpty then
+      println("  Calls: (none detected)")
+    else {
+      println(s"  Calls (${r.callees.size}):")
+      r.callees.foreach { c =>
+        val loc = c.file.map(f => s" — ${ctx.workspace.relativize(f)}:${c.line.getOrElse("?")}").getOrElse("")
+        val pkg = if c.packageName.nonEmpty then s" (${c.packageName})" else ""
+        println(s"    ${c.kind.toString.toLowerCase.padTo(4, ' ')} ${c.name}$pkg$loc")
+      }
+    }
+    if r.callers.nonEmpty then {
+      println()
+      println(s"  Called by (${r.callers.size}):")
+      r.callers.foreach { ref =>
+        val rel = ctx.workspace.relativize(ref.file)
+        println(s"    $rel:${ref.line} — ${ref.contextLine}")
+      }
+    }
+  }
+}
+
+private def renderScaffoldImpl(r: CmdResult.ScaffoldImpl, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then {
+    val entries = r.unimplemented.flatMap { (parentName, parentFile, parentLine, members) =>
+      members.map { m =>
+        val rel = jsonEscape(ctx.workspace.relativize(parentFile).toString)
+        s"""{"name":"${jsonEscape(m.name)}","kind":"${m.kind.toString.toLowerCase}","signature":"${jsonEscape(m.signature)}","from":"${jsonEscape(parentName)}","fromFile":"$rel","fromLine":$parentLine}"""
+      }
+    }
+    val targetRel = jsonEscape(ctx.workspace.relativize(r.targetFile).toString)
+    val code = r.unimplemented.flatMap(_.members).map { m =>
+      val stub = m.kind match
+        case SymbolKind.Type => s"override ${m.signature} = Any // TODO: specify concrete type"
+        case _ => s"override ${m.signature} = ???"
+      jsonEscape(stub)
+    }
+    val arr = entries.mkString("[", ",", "]")
+    val codeArr = code.map(c => s""""$c"""").mkString("[", ",", "]")
+    println(s"""{"target":"${jsonEscape(r.targetName)}","targetFile":"$targetRel","targetLine":${r.targetLine},"package":"${jsonEscape(r.targetPackage)}","stubs":$arr,"code":$codeArr}""")
+  } else {
+    if r.unimplemented.isEmpty then
+      println(s"${r.targetName}: all abstract members are implemented")
+    else {
+      r.unimplemented.foreach { (parentName, parentFile, _, members) =>
+        val rel = ctx.workspace.relativize(parentFile)
+        println(s"// Unimplemented members from $parentName ($rel)")
+      }
+      val targetRel = ctx.workspace.relativize(r.targetFile)
+      println(s"// Insert into ${r.targetName} at $targetRel:${r.targetLine}")
+      println()
+      r.unimplemented.foreach { (_, _, _, members) =>
+        members.foreach { m =>
+          m.kind match
+            case SymbolKind.Type => println(s"override ${m.signature} = Any // TODO: specify concrete type")
+            case _ => println(s"override ${m.signature} = ???")
+        }
+      }
+    }
+  }
+}
+
+private def renderScaffoldTest(r: CmdResult.ScaffoldTest, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then {
+    val members = r.publicMembers.map { m =>
+      s"""{"name":"${jsonEscape(m.name)}","signature":"${jsonEscape(m.signature)}"}"""
+    }.mkString("[", ",", "]")
+    val targetRel = jsonEscape(ctx.workspace.relativize(r.targetFile).toString)
+    println(s"""{"target":"${jsonEscape(r.targetName)}","targetFile":"$targetRel","targetLine":${r.targetLine},"package":"${jsonEscape(r.targetPackage)}","framework":"${r.framework}","members":$members}""")
+  } else {
+    r.framework match
+      case "scalatest" =>
+        println("import org.scalatest.flatspec.AnyFlatSpec")
+        println("import org.scalatest.matchers.should.Matchers")
+        println()
+        println(s"class ${r.targetName}Spec extends AnyFlatSpec with Matchers:")
+        if r.publicMembers.isEmpty then
+          println(s"""  it should "work" in:""")
+          println("    ???")
+        else
+          r.publicMembers.foreach { m =>
+            println(s"""  "${r.targetName}" should "${m.name}" in:""")
+            println("    ???")
+          }
+      case "zio-test" =>
+        println("import zio.test.*")
+        println()
+        println(s"object ${r.targetName}Spec extends ZIOSpecDefault:")
+        println(s"""  def spec = suite("${r.targetName}")(""")
+        if r.publicMembers.isEmpty then
+          println(s"""    test("should work")(???)""")
+        else
+          r.publicMembers.zipWithIndex.foreach { (m, i) =>
+            val comma = if i < r.publicMembers.size - 1 then "," else ""
+            println(s"""    test("${m.name} should ...")(???)$comma""")
+          }
+        println("  )")
+      case _ => // munit (default)
+        println(s"class ${r.targetName}Spec extends munit.FunSuite:")
+        if r.publicMembers.isEmpty then
+          println("""  test("should work"):""")
+          println("    ???")
+        else
+          r.publicMembers.foreach { m =>
+            println(s"""  test("${m.name} should ..."):""")
+            println("    ???")
+          }
   }
 }
 

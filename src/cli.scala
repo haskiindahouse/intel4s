@@ -41,13 +41,15 @@ case class ParsedFlags(
   maxOutput: Int = 0,
   inPackageFilter: Option[String] = None,
   eachMethod: Boolean = false,
+  semantic: Boolean = false,
+  framework: String = "munit",
   cleanArgs: List[String] = Nil,
 )
 
 private val flagsWithArgs = Set("--limit", "--kind", "--workspace", "-w", "--path", "--exclude-path", "-C", "-e", "--category",
                          "--in", "--of", "--impl-limit", "--depth", "--has-method", "--extends", "--body-contains", "--focus-package", "--expand",
                          "--members-limit", "--used-by", "--returns", "--takes", "--top", "--max-lines", "--offset",
-                         "--max-output", "--in-package")
+                         "--max-output", "--in-package", "--framework")
 
 def parseFlags(argList: List[String]): ParsedFlags =
   val limit = argList.indexOf("--limit") match
@@ -159,6 +161,10 @@ def parseFlags(argList: List[String]): ParsedFlags =
     case -1 => None
     case i => argList.lift(i + 1)
   val eachMethod = argList.contains("--each-method")
+  val semantic = argList.contains("--semantic")
+  val framework: String = argList.indexOf("--framework") match
+    case -1 => "munit"
+    case i => argList.lift(i + 1).getOrElse("munit")
 
   val cleanArgs = argList.filterNot(a => a.startsWith("--") || a == "-w" || a == "-C" || a == "-e" || a == "-c" || {
     val prev = argList.indexOf(a) - 1
@@ -171,7 +177,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     hasMethodFilter, extendsFilter, bodyContainsFilter, focusPackage, expandDepth, membersLimit,
     brief, strict, usedByFilter, returnsFilter, takesFilter, shallow, noDoc, excludePath, topN,
     summaryMode, timingsEnabled, withBody, maxBodyLines, showImports, offset, related, explainMode,
-    concise, maxOutput, inPackageFilter, eachMethod, cleanArgs)
+    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, cleanArgs)
 
 private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
                            batchMode: Boolean = false, effectiveNoTests: Option[Boolean] = None): CommandContext =
@@ -192,7 +198,9 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
     withBody = f.withBody, maxBodyLines = f.maxBodyLines, showImports = f.showImports,
     offset = f.offset, related = f.related, explainMode = f.explainMode, concise = f.concise,
     maxOutput = f.maxOutput, inPackageFilter = f.inPackageFilter,
-    eachMethod = f.eachMethod)
+    eachMethod = f.eachMethod,
+    semantic = f.semantic,
+    framework = f.framework)
 
 @main def main(args: String*): Unit =
   val f = parseFlags(args.toList)
@@ -237,6 +245,11 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  scalex api <package>            Public API surface of a package (aka: exported symbols)
         |  scalex summary <package>        Sub-packages with symbol counts   (aka: package breakdown)
         |  scalex entrypoints              Find @main, def main, extends App, test suites
+        |  scalex rename <Old> <New>       Rename symbol across codebase      (aka: refactor rename)
+        |  scalex unused [package]         Find symbols with zero external refs (aka: dead code)
+        |  scalex call-graph <method>      Show what a method calls and who calls it
+        |  scalex scaffold impl <class>    Generate stubs for unimplemented abstract members
+        |  scalex scaffold test <class>    Generate test suite skeleton
         |  scalex graph --render "A->B"    Render directed graph as ASCII/Unicode art
         |  scalex graph --parse            Parse ASCII diagram from stdin into boxes+edges
         |  scalex mcp                      Start MCP server (JSON-RPC over stdio)
@@ -294,6 +307,8 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  --takes TYPE          Search: filter to symbols whose signature takes TYPE
         |  --max-output N        Truncate output at N characters (0 = unlimited); works on all commands
         |  --in-package PKG      Filter results to files whose package matches PKG prefix
+        |  --semantic            Refs/rename: use SemanticDB for type-aware refs (requires compiled project)
+        |  --framework NAME     Scaffold test: test framework (munit, scalatest, zio-test; default: munit)
         |  --timings             Print per-phase timing breakdown to stderr
         |
         |All commands accept an optional [workspace] positional arg or -w flag (default: current directory).
@@ -353,6 +368,31 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
       renderWithBudget(result, ctx)
       Timings.report()
 
+    case "scaffold" :: _ =>
+      val workspace = resolveWorkspace(f.explicitWorkspace.getOrElse("."))
+      val idx = WorkspaceIndex(workspace, needBlooms = false)
+      idx.index()
+      val ctx = flagsToContext(f, idx, workspace)
+      val scaffoldArgs = f.cleanArgs.drop(1)
+      runCommand("scaffold", scaffoldArgs, ctx)
+      Timings.report()
+
+    case "rename" :: _ =>
+      val workspace = resolveWorkspace(f.explicitWorkspace.getOrElse("."))
+      val idx = WorkspaceIndex(workspace, needBlooms = true)
+      idx.index()
+      val ctx = flagsToContext(f, idx, workspace)
+      runCommand("rename", f.cleanArgs.drop(1), ctx)
+      Timings.report()
+
+    case "call-graph" :: _ =>
+      val workspace = resolveWorkspace(f.explicitWorkspace.getOrElse("."))
+      val idx = WorkspaceIndex(workspace, needBlooms = true)
+      idx.index()
+      val ctx = flagsToContext(f, idx, workspace)
+      runCommand("call-graph", f.cleanArgs.drop(1), ctx)
+      Timings.report()
+
     case cmd :: rest =>
       val (workspace, cmdRest) = f.explicitWorkspace match
         case Some(ws) =>
@@ -370,7 +410,7 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
       // overview defaults to --no-tests unless --include-tests is explicitly passed
       val effectiveNoTests = if cmd == "overview" && !f.includeTests then true else f.noTests
 
-      val bloomCmds = Set("refs", "imports", "coverage")
+      val bloomCmds = Set("refs", "imports", "coverage", "rename", "unused", "call-graph")
       val idx = WorkspaceIndex(workspace, needBlooms = bloomCmds.contains(cmd))
       idx.index()
       val ctx = flagsToContext(f, idx, workspace, effectiveNoTests = Some(effectiveNoTests))

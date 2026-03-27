@@ -1,97 +1,49 @@
-# Scalex Mascot Brief
+# intel4s Mascot Brief
 
-A design brief for creating a mascot that represents Scalex — a Scala code intelligence tool built for coding agents.
+## The Vulture
 
-## What Scalex Is
+**Гриф** — падальщик. Не охотник, не хищник. Он приходит ПОСЛЕ. Он видит то, что другие пропустили. Он находит мёртвое.
 
-A small, fast, sharp tool that scans an entire Scala codebase in seconds and tells you exactly where things are defined, who uses them, and how they connect. No compiler, no build server — just source code and git.
+### Почему гриф?
 
-## Core Qualities to Represent
-
-| Quality | What it means | Visual metaphor |
+| Качество | В природе | В intel4s |
 |---|---|---|
-| **Speed** | Indexes 18k files in 3s, queries in <1s | Swift motion, streamlined form |
-| **Sharp vision** | Finds symbols, definitions, references with precision | Keen eyes, focused gaze |
-| **Lightweight** | Single 26MB binary, no dependencies | Small body, minimal form |
-| **Scala-native** | Understands Scala 3 syntax (enums, givens, extensions) | Scales, red Scala color palette |
-| **Coding agent companion** | Built for coding agents, not humans in IDEs | Friendly, approachable, sits on a shoulder |
-| **Source-level** | Reads raw source, no compilation needed | Sees through surfaces, x-ray vision |
-| **Git-native** | Uses git for file discovery and cache invalidation | Connected to the ground/roots |
+| **Видит мёртвое** | Находит падаль с высоты 5 км | `unused` — находит dead code |
+| **Острейшее зрение** | Лучшее зрение среди птиц | `refs --semantic` — type-aware, видит то что grep не может |
+| **Чистильщик** | Убирает то что гниёт | `rename`, `unused` — чистит кодбейз |
+| **Терпеливый** | Часами кружит, ждёт момент | Индексирует 18k файлов, потом мгновенный ответ |
+| **Не боится размера** | Ест туши слонов | Scala 3 compiler (18k files, 144k symbols) |
+| **Работает в группе** | Стаи грифов эффективнее | MCP — работает с Cursor, Windsurf, Claude Code |
+| **Ugly but essential** | Без них экосистема ломается | CLI не красивый, но без него агенты слепы |
 
-## Mascot Direction: The Scalex Kestrel
+### Настроение
 
-A **small kestrel** (the smallest falcon) — fast, sharp-eyed, lightweight, hovers while scanning.
+Scalex — милый кестрел. Помощник на плече.
 
-### Why a kestrel?
+intel4s — **гриф на столбе**. Он не мил. Он эффективен. Он видит мёртвый код за километр. Он не спрашивает разрешения — он показывает что сгнило.
 
-- **Smallest falcon** — reflects our lightweight, minimal design
-- **Incredible eyesight** — spots symbols from across 18k files, like a kestrel spots prey from 50 meters
-- **Hovers in place** — systematically scans an area before diving, like indexing before querying
-- **Fast dive** — instant results once it finds the target
-- **Works near humans** — kestrels live alongside people, like Scalex works alongside coding agents
-- **Not a predator to fear** — helpful, companion-like
+### Визуал
 
-### Visual Details
+- **Поза**: сидит на фигурной скобке `{`, голова наклонена, один глаз смотрит вниз — "я вижу что здесь мертво"
+- **Цвета**: тёмный корпус (#1a1a2e), purple accent (#8b5cf6) на глазах и кончиках крыльев
+- **Глаза**: яркие, фиолетовые, слегка светятся — сканирующий взгляд
+- **Стиль**: геометрический, минималистичный, не cartoon
+- **Шея**: характерная лысая шея грифа — узнаваемый силуэт
+- **Размер**: крупнее кестрела, внушительный но не угрожающий
 
-- **Colors**: Scala red (#DC322F) as accent, dark charcoal body, bright sharp eyes
-- **Size**: Small, compact — should feel light and agile, not imposing
-- **Eyes**: Large, bright, slightly glowing — the defining feature (represents scanning/indexing)
-- **Posture**: Alert, perched and ready to launch — or hovering mid-scan
-- **Style**: Clean, geometric, modern — not overly detailed or cartoonish
-- **Optional**: Small scale pattern on feathers (nod to Scala = "scale" in Italian)
-- **Optional**: Faint binary/code pattern in wing feathers (nod to source code)
+### Альтернативные позы
 
-### Poses
+1. **Primary**: сидит на `{`, смотрит вниз — "scanning for dead code"
+2. **Кружит**: вид сверху, крылья расправлены — "indexing 18k files"
+3. **Нашёл**: пикирует к `unused` символу — "dead code detected"
+4. **Semantic**: один глаз фиолетовый (semantic), другой белый (text) — hybrid mode
 
-1. **Primary**: Perched on a code bracket `{`, head turned, one eye focused forward — "I see everything"
-2. **Scanning**: Hovering with wings spread, eyes glowing — "indexing in progress"
-3. **Found it**: Diving downward toward a target — "definition found"
-4. **Companion**: Sitting on a robot shoulder — "built for coding agents"
+### Палитра
 
-## Alternative Directions
-
-### Direction B: The Lens Fox
-
-A small **geometric fox** with crystalline/lens-like eyes. Foxes are clever (code-native), quick (fast queries), and navigate complex terrain (large codebases). The crystal eyes represent seeing through code structure.
-
-### Direction C: The Scale Pangolin
-
-A small **pangolin** with visible scales — direct visual pun on "Scala" (Italian for scale/staircase). Pangolins are compact, armored (reliable), and curl into a ball (self-contained, single binary). Less common as a mascot = more distinctive.
-
-### Direction D: Abstract Mark
-
-Not an animal — a **stylized eye or lens** with Scala's red, formed from the letter "S" or code brackets. Clean, professional, works at any size. Less personality but more versatile for logos/favicons.
-
-## Usage Context
-
-The mascot will appear in:
-- GitHub repo avatar and social preview
-- README header
-- CLI splash screen (ASCII art version)
-- Claude Code plugin icon
-- Documentation site (if we build one)
-
-Should work at:
-- 16x16 (favicon)
-- 64x64 (GitHub avatar)
-- 256x256+ (README, docs)
-- Monochrome (terminal/ASCII)
-
-## Brand Personality
-
-If Scalex were a coworker, it would be:
-- The one who instantly knows where every file is
-- Quiet, fast, never blocks your workflow
-- Shows up when you need it, disappears when you don't
-- Knows Scala inside and out but doesn't brag about it
-- Says "here's what I found" and gives you exactly what you need, nothing more
-
-## Color Palette
-
-| Color | Hex | Usage |
+| Цвет | Hex | Где |
 |---|---|---|
-| Scala Red | #DC322F | Primary accent, eyes, highlights |
-| Dark Charcoal | #2B2B2B | Body, primary surfaces |
-| Warm Gray | #6C6C6C | Secondary, shadows |
-| White/Light | #F5F5F5 | Eyes, highlights, contrast |
-| Terminal Green | #4EC9B0 | Optional accent for code/tech feel |
+| Deep Purple | #8b5cf6 | Глаза, акценты, highlights |
+| Dark Body | #1a1a2e | Корпус, перья |
+| Bone White | #e8e6e3 | Клюв, когти, контраст |
+| Faint Green | #4ec9b0 | Terminal/code accent |
+| Dead Red | #ef4444 | Dead code indicators |

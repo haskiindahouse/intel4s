@@ -197,7 +197,7 @@ object IndexPersistence:
 
 class WorkspaceIndex(val workspace: Path, val needBlooms: Boolean = true):
   var gitFiles: List[GitFile] = Nil
-  private var indexedFiles: List[IndexedFile] = Nil
+  var indexedFiles: List[IndexedFile] = Nil
 
   private lazy val allSymbols: List[SymbolInfo] =
     Timings.phase("build-allSymbols") {
@@ -205,6 +205,12 @@ class WorkspaceIndex(val workspace: Path, val needBlooms: Boolean = true):
     }
 
   lazy val symbols: List[SymbolInfo] = allSymbols
+
+  /** SemanticDB index — loaded lazily when first accessed. Provides type-aware refs. */
+  lazy val semanticIndex: Option[SemanticIndex] =
+    Timings.phase("load-semanticdb") {
+      SemanticIndex.load(workspace)
+    }
 
   lazy val filesByPath: Map[Path, List[SymbolInfo]] =
     Timings.phase("build-filesByPath") {
@@ -688,7 +694,7 @@ class WorkspaceIndex(val workspace: Path, val needBlooms: Boolean = true):
         while ni < nLower.length && !isSegmentStart(name, ni) do ni += 1
     qi == qLower.length
 
-  private def containsWord(line: String, word: String): Boolean =
+  def containsWord(line: String, word: String): Boolean =
     var i = line.indexOf(word)
     while i >= 0 do
       val before = i == 0 || !line(i - 1).isLetterOrDigit

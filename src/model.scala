@@ -120,6 +120,14 @@ case class ExplainedImpl(sym: SymbolInfo, members: List[MemberInfo], subImpls: L
 
 case class PackageExplainedEntry(sym: SymbolInfo, members: List[MemberInfo], implCount: Int)
 
+// ── Rename types ──────────────────────────────────────────────────────────
+
+case class RenameEdit(file: Path, line: Int, oldLine: String, newLine: String, category: String)
+
+// ── Call graph types ──────────────────────────────────────────────────────
+
+case class CalleeInfo(name: String, kind: SymbolKind, file: Option[Path], line: Option[Int], packageName: String, signature: String)
+
 // ── Entrypoint types ───────────────────────────────────────────────────────
 
 case class EntrypointInfo(sym: SymbolInfo, category: EntrypointCategory, memberLine: Option[Int] = None)
@@ -161,6 +169,8 @@ case class CommandContext(
   maxOutput: Int = 0,
   inPackageFilter: Option[String] = None,
   eachMethod: Boolean = false,
+  semantic: Boolean = false,
+  framework: String = "munit",
 ):
   val fmt: (SymbolInfo, Path) => String = if verbose then formatSymbolVerbose else formatSymbol
   val jRef: Reference => String =
@@ -234,5 +244,9 @@ enum CmdResult:
   case RefsSummary(symbol: String, categoryCounts: List[(category: RefCategory, count: Int)], total: Int, timedOut: Boolean)
   case Entrypoints(entries: List[EntrypointInfo], total: Int)
   case GraphOutput(text: String)
+  case RenameResult(oldName: String, newName: String, definition: SymbolInfo, edits: List[RenameEdit])
+  case CallGraph(method: String, file: Path, line: Int, owner: String, callees: List[CalleeInfo], callers: List[Reference])
+  case ScaffoldImpl(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, unimplemented: List[(parentName: String, parentFile: Path, parentLine: Int, members: List[MemberInfo])])
+  case ScaffoldTest(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, publicMembers: List[MemberInfo], framework: String)
   case NotFound(message: String, hint: NotFoundHint)
   case UsageError(message: String)

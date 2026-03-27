@@ -13,6 +13,10 @@ val commands: Map[String, (List[String], CommandContext) => CmdResult] = Map(
   "api" -> cmdApi,
   "summary" -> cmdSummary,
   "entrypoints" -> cmdEntrypoints,
+  "scaffold" -> cmdScaffold,
+  "rename" -> cmdRename,
+  "unused" -> cmdUnused,
+  "call-graph" -> cmdCallGraph,
 )
 
 def runCommand(cmd: String, args: List[String], ctx: CommandContext): Unit =

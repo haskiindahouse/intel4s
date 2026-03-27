@@ -1,6 +1,6 @@
 ---
 name: scalex
-description: "Scala/Java code intelligence CLI for Scala 2/3 and Java codebases. Find definitions, implementations, usages, imports, members, scaladoc, codebase overview, package API surface, files, annotated symbols, file contents. Render directed graphs as ASCII/Unicode art and parse diagrams. Triggers: \"where is X defined\", \"who implements Y\", \"find usages of Z\", \"what methods does X have\", \"show source of X\", \"inheritance tree\", \"explain this type\", \"what changed since commit\", \"find types extending X with method Y\", \"what does this package export\", or before renaming. Test navigation: \"what tests exist\", \"is X tested\". Use proactively exploring unfamiliar Scala code. Supports fuzzy camelCase search. Prefer scalex over grep/glob for Scala symbol lookups. The graph command (ASCII/Unicode art rendering) should only be used when the user explicitly asks to draw, render, or visualize a graph/diagram — never run it automatically as part of other workflows."
+description: "Scala/Java AI agent with code intelligence, safe refactoring, and code generation. 36 commands: search, navigate, rename, scaffold, call-graph, dead code detection. Triggers: \"where is X defined\", \"rename X to Y\", \"implement this trait\", \"find dead code\", \"what calls this method\", \"generate tests\", \"refactor\", \"explore this codebase\", \"who implements Y\", \"find usages of Z\", \"what methods does X have\", \"show source of X\", \"inheritance tree\", \"explain this type\", \"what changed since commit\", \"what does this package export\". Use proactively when working with Scala code. Prefer scalex over grep for Scala symbol lookups. Orchestrate multi-step workflows autonomously for complex tasks like refactoring, impact analysis, and codebase exploration."
 ---
 
 You have access to `scalex`, a Scala/Java code intelligence CLI that understands Scala syntax (classes, traits, objects, enums, givens, extensions, type aliases, defs, vals) and Java syntax (classes, interfaces, enums, records, methods, fields). It parses Scala source files via Scalameta and Java files via JavaParser — no compiler or build server needed. Works with both Scala 3 and Scala 2 files (tries Scala 3 dialect first, falls back to Scala 2.13).
@@ -338,13 +338,99 @@ scalex tests --verbose                          # Show body for every test (no f
 scalex tests --json                             # Structured JSON output
 ```
 
+### `scalex rename <OldName> <NewName> [--no-tests] [--path PREFIX]` — safe rename
+
+Finds ALL occurrences of a symbol (definition, imports, usages) and generates an edit plan with exact old→new line replacements. Word-boundary aware — renaming `Repository` does NOT affect `UserRepository`.
+
+```bash
+scalex rename PaymentService BillingService
+scalex rename PaymentService BillingService --json   # structured edit list for programmatic use
+```
+```
+Rename "PaymentService" → "BillingService" — 12 edits in 5 files:
+
+  src/PaymentService.scala
+    L3 [definition]  trait PaymentService {
+       →  trait BillingService {
+  src/Client.scala
+    L2 [import]  import com.example.PaymentService
+       →  import com.example.BillingService
+    L5 [usage]  val svc: PaymentService = ???
+       →  val svc: BillingService = ???
+```
+
+**JSON output** includes `edits[]` with `file`, `line`, `old`, `new`, `category` — apply edits programmatically with Edit tool.
+
+### `scalex unused [package] [--kind K] [--no-tests] [--path PREFIX]` — dead code detection
+
+Finds symbols with zero references outside their definition file. Uses bloom filter pre-screening + text verification. Defaults to types only (class/trait/object/enum); use `--kind def` to check methods.
+
+```bash
+scalex unused                       # all unused types in the project
+scalex unused com.example.legacy    # unused types in a specific package
+scalex unused --kind def            # unused top-level defs
+```
+```
+Potentially unused symbols — 3 found:
+  trait  DeprecatedApi     (com.example) — src/Api.scala:3
+  class  OrphanProcessor   (com.example) — src/Processor.scala:12
+  object OldHelpers         (com.legacy)  — src/Legacy.scala:5
+```
+
+### `scalex call-graph <method> [--in Owner] [--brief] [--limit N]` — method call graph
+
+Shows what a method calls (callees from body analysis) and who calls it (callers from refs). Two-directional: understand both flow into and out of a method. Use `--in Owner` to disambiguate when multiple classes have the same method name. Use `--brief` to skip callers section.
+
+```bash
+scalex call-graph processPayment --in PaymentService
+scalex call-graph run --in Phase --brief   # callees only
+scalex call-graph main --json              # structured output
+```
+```
+Call graph for PaymentService.processPayment (src/Payment.scala:15)
+
+  Calls (3):
+    def  validate     (com.example) — src/Validator.scala:8
+    def  charge       (com.billing) — src/Billing.scala:22
+    def  notifyUser   (com.notify)  — src/Notifier.scala:5
+
+  Called by (4):
+    src/Handler.scala:30 — svc.processPayment(amount)
+    src/BatchJob.scala:15 — payments.foreach(p => processPayment(p))
+```
+
+### `scalex scaffold impl <class>` — generate implementation stubs
+
+Walks the parent chain, finds unimplemented abstract members, generates `override ... = ???` stubs with type parameter substitution. Outputs code to stdout — never writes files.
+
+```bash
+scalex scaffold impl UserServiceLive
+scalex scaffold impl UserServiceLive --json   # structured output with target file/line
+```
+```
+// Unimplemented members from UserService (src/UserService.scala:3)
+// Insert into UserServiceLive at src/UserServiceLive.scala:8
+
+override def findUser(id: UserId): Task[Option[User]] = ???
+override def createUser(name: String, email: String): Task[User] = ???
+```
+
+### `scalex scaffold test <class> [--framework munit|scalatest|zio-test]` — generate test skeleton
+
+Extracts public methods and generates a test suite skeleton. Supports munit (default), scalatest, and zio-test.
+
+```bash
+scalex scaffold test UserService                     # munit
+scalex scaffold test UserService --framework zio-test
+```
+
 ## Additional commands
 
 These commands are fully documented in `references/commands.md` (next to this SKILL.md). Read it when you need detailed syntax or examples.
 
 | Command | Purpose | Key flags |
 |---|---|---|
-| `overview` | Codebase summary: symbols by kind, top packages, most-extended types (hidden in `--architecture` mode — hub types supersedes) | `--architecture`, `--focus-package`, `--concise` |
+| `overview` | Codebase summary: symbols by kind, top packages, most-extended types | `--architecture`, `--focus-package`, `--concise` |
 | `file <query>` | Find files by name (fuzzy camelCase match) | |
 | `annotated <ann>` | Find symbols with a specific annotation | `--kind K` |
 | `package <pkg>` | All symbols in a package, grouped by kind | `--definitions-only`, `--verbose`, `--explain`, `--limit N` |
@@ -362,40 +448,130 @@ These commands are fully documented in `references/commands.md` (next to this SK
 | `index` | Force reindex (rarely needed) | |
 | `graph --render "A->B"` | Render directed graph as ASCII/Unicode art (**only when user explicitly asks**) | `--unicode`, `--vertical`, `--rounded`, `--double` |
 | `graph --parse` | Parse ASCII diagram from stdin into boxes+edges (**only when user explicitly asks**) | `--json` |
+| `mcp` | Start MCP server (JSON-RPC over stdio) for Cursor/Windsurf/Cline | |
 
-Full options table is also in `references/commands.md`. Graph command examples with rendered output are in `references/graph-examples.md`.
+**Important**: The `graph` command should only be used when the user explicitly asks to draw or visualize a graph — never run it automatically as part of other workflows.
 
-**Important**: The `graph` command (both `--render` and `--parse`) should only be used when the user explicitly asks to draw, render, or visualize an ASCII graph or diagram. Do not automatically run graph commands as part of other workflows like `hierarchy`, `deps`, or `explain` — those commands already have their own formatted output.
+## Agent workflows
 
-## Common workflows
+These are multi-step recipes. When the user asks for a complex task, orchestrate these steps autonomously — don't ask for permission at each step.
 
-Most commands are self-explanatory from their name — `scalex def X`, `scalex members X`, `scalex doc X`. These workflows cover the non-obvious choices:
+### Explore unfamiliar codebase
 
-**"What's the impact of renaming X?"** → `scalex refs X` (categorized by default — groups by Definition/ExtendedBy/ImportedBy/UsedAsType/Usage/Comment)
+When dropped into a new Scala project, build a mental model before doing anything else:
 
-**"What's in this package?"** → `scalex package com.example` — all symbols grouped by kind; fuzzy match on package name
+1. `overview --concise` → fixed-size summary: packages, key types, dependency stats
+2. `entrypoints` → where does execution start?
+3. `summary <top-package>` → sub-package structure
+4. For the 2-3 most important types: `explain <Type> --related` → understand the core domain
 
-**"How is this package structured?"** → `scalex summary com.example` — sub-packages with symbol counts for top-down exploration
+### Safe rename
 
-**"What does this package export?"** → `scalex api com.example` — shows symbols imported by other packages, sorted by importer count
+When asked to rename a symbol:
 
-**"Too many results / noisy output"** → combine `--no-tests`, `--path compiler/src/`, `--kind class`, `--in-package PKG`, or `search --prefix`/`--exact`. Use `--max-output N` to hard-cap output at N characters on any command
+1. `rename OldName NewName` → get the full edit plan with categories
+2. Review the edits — check for false positives (comments, string literals)
+3. Apply each edit using the Edit tool, file by file
+4. `refs OldName --count` → verify zero remaining references (should be empty)
+5. If not empty, investigate remaining references
 
-**"I need to look up 3+ symbols"** → use `batch` to load the index once: `echo -e "def Foo\nimpl Foo\nrefs Foo" | scalex batch -w /project`
+### Impact analysis before changes
 
-**"Search for a pattern in Scala files"** → `scalex grep "pattern"` — prefer this over the Grep tool for `.scala` files because it integrates with `--path` and `--no-tests`
+Before modifying a type or method:
 
-**"Show me the source code of method X"** → `scalex body X --in MyClass` — use `--in` when the name exists in multiple classes
+1. `refs Symbol --count` → quick triage: how many files are affected?
+2. `call-graph method --in Owner` → what does this method touch? who calls it?
+3. `hierarchy Symbol --depth 2` → inheritance impact
+4. `imports Symbol` → who imports this? (including wildcards)
+5. Decide scope: is this a safe local change or a cross-cutting refactor?
 
-**"Give me everything about this type"** → `scalex explain MyTrait` — one-shot composite: def + doc + members + companion + impls + import count (saves 4-5 round-trips). Use `--expand 1` to also see each implementation's members. Use `--brief` for condensed output (definition + top 3 members). Use `--body` to inline method bodies
+### Implement a trait
 
-**"Show me a class with all method bodies"** → `scalex members Compiler --body --max-lines 20` — inline bodies ≤ 20 lines; eliminates N follow-up `body --in` calls
+When asked to implement a trait or fill in abstract members:
 
-**"How do different types implement method X?"** → `scalex overrides run --of Phase --body` — show each override's source body inline
+1. `scaffold impl MyClass` → get the stubs with resolved type parameters
+2. `explain ParentTrait --verbose` → understand what each method should do
+3. For complex methods: `overrides methodName --of ParentTrait --body` → see how others implement it
+4. Write the implementations
+5. `scaffold test MyClass` → generate test skeleton, then fill in real tests
 
-**"Search within a specific class"** → `scalex grep "pattern" --in ClassName` — restrict grep to the class body; supports `Owner.member` dot syntax
+### Find and remove dead code
 
-**"Which methods in this class call X?"** → `scalex grep "test(" --in ParseSuite --each-method` — per-method grep: iterates members, reports which methods matched with counts
+1. `unused com.example` → find candidates
+2. For each candidate: `refs CandidateName --count` → double-check (unused only checks external refs)
+3. `coverage CandidateName` → is it tested? (tests referencing unused code = test-only code)
+4. Remove confirmed dead code, update tests
+
+### Bug investigation
+
+When investigating a bug in a Scala codebase:
+
+1. `search <keyword>` → find relevant types
+2. `explain <Type> --related` → understand the type and its connections
+3. `call-graph <suspectMethod> --in Owner` → trace the execution flow
+4. `body <method> --in Owner --imports` → read the actual code with imports
+5. `refs <method> --count` → how is this called? from where?
+6. Narrow down: `grep "pattern" --in ClassName --each-method` → which methods have the pattern?
+
+### Refactor workflow
+
+When asked to refactor (extract, rename, restructure):
+
+1. `explain <Target> --inherited --related` → full picture of the type
+2. `refs <Target> --count` → measure impact
+3. `unused <package>` → find dead code to clean up while refactoring
+4. Make the changes (rename, scaffold, restructure)
+5. `refs OldName --count` → verify clean rename (should be 0)
+6. `coverage <NewName>` → verify test coverage still applies
+
+### Package audit
+
+When asked to assess a package's health:
+
+1. `summary <package>` → structure overview
+2. `api <package>` → what's exported? what's truly public?
+3. `unused <package>` → dead code
+4. `ast-pattern --extends <BaseTrait> --has-method <required>` → structural compliance check
+5. `api <package> --used-by <consumer-package>` → coupling analysis
+
+## Quick reference: which command to use
+
+| I want to... | Command |
+|---|---|
+| Find where X is defined | `def X` |
+| Understand X completely | `explain X --related` |
+| Who uses X? | `refs X --count` then `refs X` |
+| Who implements X? | `impl X` |
+| What's inside X? | `members X --inherited` |
+| What does method X call? | `call-graph X --in Owner` |
+| Rename X safely | `rename X NewName` |
+| Find dead code | `unused [package]` |
+| Generate impl stubs | `scaffold impl MyClass` |
+| Generate test skeleton | `scaffold test MyClass` |
+| Impact of changing X? | `refs X --count` + `call-graph X` |
+| Is X tested? | `coverage X` |
+| Explore a package | `package pkg` → `api pkg` → `summary pkg` |
+| Search by pattern | `grep "pattern"` (Scala files) or Grep tool (other files) |
+| Codebase overview | `overview --concise` |
+| Find entry points | `entrypoints` |
+
+## Common workflows (quick)
+
+**"What's in this package?"** → `package com.example`
+
+**"What does this package export?"** → `api com.example --used-by com.consumer`
+
+**"Too many results"** → add `--no-tests`, `--path prefix/`, `--kind class`, `--in-package PKG`, `--max-output N`
+
+**"I need 3+ lookups"** → `echo -e "def Foo\nimpl Foo\nrefs Foo" | scalex batch -w /project`
+
+**"Show source of method X"** → `body X --in MyClass --imports`
+
+**"Everything about this type"** → `explain X --expand 1 --body --inherited`
+
+**"How others implement method X"** → `overrides X --of Trait --body`
+
+**"Search within a class"** → `grep "pattern" --in ClassName --each-method`
 
 **"What types should I explore next?"** → `scalex explain UserService --related` — shows project-defined types from member signatures (User, Database, etc.)
 
