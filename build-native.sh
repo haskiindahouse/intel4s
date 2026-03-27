@@ -17,6 +17,7 @@ scala-cli package --native-image \
   --force \
   -- --no-fallback \
   --initialize-at-run-time=com.google.common.hash.Striped64,com.google.common.hash.LongAdder,com.google.common.hash.BloomFilter,com.google.common.hash.BloomFilterStrategies \
+  --exclude-config ".*jline.*" ".*" \
   ${MARCH_FLAG[@]+"${MARCH_FLAG[@]}"}
 
 echo ""
