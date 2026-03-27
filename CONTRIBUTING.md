@@ -4,7 +4,7 @@
 
 ```bash
 # Prerequisites: JDK 21+, scala-cli
-git clone https://github.com/YOUR_USERNAME/intel4s.git
+git clone https://github.com/haskiindahouse/intel4s.git
 cd intel4s
 
 # Run from source
