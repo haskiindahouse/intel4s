@@ -112,7 +112,13 @@ Then ask:
 
 > *"use intel4s to explore how authentication works in this codebase"*
 
-The plugin installs the skill (teaches Claude when and how to use intel4s) and a bootstrap script that auto-downloads the native binary on first run.
+The plugin installs skills, an agent, and a bootstrap script that auto-downloads the native binary on first run.
+
+Then set up your project:
+
+> */intel4s:setup*
+
+This detects your build tool, analyzes the codebase, and writes a Scala Code Intelligence section to your `CLAUDE.md` so the agent knows when and how to use intel4s.
 
 ### CLI
 
@@ -124,6 +130,23 @@ cd intel4s && ./build-native.sh
 # Or run directly without building
 scala-cli run src/ -- search /path/to/project MyClass
 ```
+
+---
+
+## Plugin Skills
+
+After installing in Claude Code, run `/intel4s:setup` to configure your project. The plugin provides:
+
+| Skill | Purpose |
+|---|---|
+| `/intel4s:setup` | One-time project onboarding — writes CLAUDE.md section |
+| `/intel4s:semanticdb` | Enable SemanticDB for type-aware rename and call-graph |
+| `/intel4s:upgrade` | Upgrade scalex binary to latest release |
+| `/intel4s:doctor` | Diagnostic check — binary, SemanticDB, CLAUDE.md |
+
+The plugin also includes a **scala-expert** agent that Claude invokes automatically for complex multi-step tasks (refactoring, impact analysis, codebase exploration). It chains 3+ scalex commands together following built-in workflow recipes.
+
+For full command documentation, see [SKILL.md](plugins/scalex/skills/scalex/SKILL.md).
 
 ---
 
