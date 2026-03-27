@@ -12,9 +12,9 @@ REPO="haskiindahouse/intel4s"
 
 # Expected SHA-256 checksums for each artifact (updated each release alongside EXPECTED_VERSION)
 # Will be populated after first release build
-CHECKSUM_scalex_macos_arm64=""
-CHECKSUM_scalex_macos_x64=""
-CHECKSUM_scalex_linux_x64=""
+CHECKSUM_scalex_macos_arm64="4100c75633dde040b4266b8a6609ac39ef3d6a056341e7d1b0be90d6f32141e1"
+CHECKSUM_scalex_macos_x64="c29e32dd3ef115fdb4e3cf106bd2cd95a5bba9f91e37350b806241aa37929cfa"
+CHECKSUM_scalex_linux_x64="c9be1856672d055a32c985f4a5ed7b4fbb4ef4ce90a86a0fbd39188a11a346d9"
 
 # Cache location: follow XDG spec
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/intel4s"
