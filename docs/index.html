@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>intel4s — Code Intelligence for Scala</title>
+
+    <meta name="description" content="Code intelligence for Scala. Works without a build. Gets smarter when you compile." />
+    <meta property="og:title" content="intel4s — Code Intelligence for Scala" />
+    <meta property="og:description" content="Semantic rename, call-graph, dead code detection. No build server needed — type-aware when compiled." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="intel4s — Code Intelligence for Scala" />
+    <meta name="twitter:description" content="Works without a build. Gets smarter when you compile." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+
+    <style>
+      :root {
+        --bg-primary: #08080d;
+        --bg-secondary: #0e0e16;
+        --bg-card: #12121c;
+        --bg-code: #161622;
+        --text-primary: #e8e6e3;
+        --text-secondary: #7a7884;
+        --text-dim: #4a4856;
+        --accent: #8b5cf6;
+        --accent-glow: rgba(139, 92, 246, 0.15);
+        --accent-bright: #a78bfa;
+        --green: #4ec9b0;
+        --yellow: #d4a843;
+        --blue: #569cd6;
+        --red: #ef4444;
+        --border: #1e1e2a;
+        --font-display: "Outfit", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --title-size: clamp(2rem, 6vw, 5rem);
+        --h2-size: clamp(1.5rem, 4vw, 3rem);
+        --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+        --body-size: clamp(0.75rem, 1.4vw, 1.1rem);
+        --small-size: clamp(0.65rem, 1vw, 0.85rem);
+        --code-size: clamp(0.6rem, 1vw, 0.8rem);
+        --slide-padding: clamp(1.5rem, 5vw, 5rem);
+        --content-gap: clamp(0.75rem, 2vw, 2rem);
+        --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+      body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-display); font-size: var(--body-size); line-height: 1.6; overflow-x: hidden; }
+
+      .slide { min-height: 100dvh; scroll-snap-align: start; display: flex; align-items: center; justify-content: center; padding: var(--slide-padding); position: relative; }
+      .slide-content { max-width: 1100px; width: 100%; display: flex; flex-direction: column; gap: var(--content-gap); }
+      .slide-number { position: absolute; top: var(--slide-padding); left: var(--slide-padding); font-family: var(--font-mono); font-size: var(--small-size); color: var(--text-dim); }
+
+      h1 { font-size: var(--title-size); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+      h2 { font-size: var(--h2-size); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+      h3 { font-size: var(--h3-size); font-weight: 600; }
+      .accent { color: var(--accent-bright); }
+      .red { color: var(--red); }
+      .green { color: var(--green); }
+      .mono { font-family: var(--font-mono); font-size: 0.9em; }
+      .subtitle { color: var(--text-secondary); max-width: 700px; }
+
+      /* Title slide */
+      .title-slide { text-align: center; }
+      .title-slide .slide-content { align-items: center; }
+      .title-slide::after { content: ""; position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); width: min(700px, 100vw); height: min(700px, 100vw); background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%); pointer-events: none; z-index: 0; }
+      .title-slide > * { position: relative; z-index: 1; }
+      .title-slide .slide-content { z-index: 1; }
+      .title-tagline { color: var(--text-secondary); font-size: clamp(0.9rem, 1.8vw, 1.3rem); max-width: 600px; }
+
+      .stat-row { display: flex; gap: clamp(1.5rem, 4vw, 4rem); margin-top: clamp(0.5rem, 1.5vw, 1rem); }
+      .stat-value { font-family: var(--font-mono); font-size: clamp(1.2rem, 3vw, 2rem); font-weight: 700; color: var(--accent-bright); }
+      .stat-label { font-size: var(--small-size); color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+      /* Cards */
+      .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: clamp(0.5rem, 1.5vw, 1rem); }
+      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: clamp(1rem, 2vw, 1.5rem); transition: border-color 0.2s; }
+      .card:hover { border-color: var(--accent); }
+      .card h3 { margin-bottom: 0.5em; }
+      .card p { color: var(--text-secondary); font-size: var(--small-size); }
+
+      /* Terminal */
+      .terminal { background: var(--bg-code); border: 1px solid var(--border); border-radius: 10px; padding: clamp(0.8rem, 1.5vw, 1.2rem); font-family: var(--font-mono); font-size: var(--code-size); line-height: 1.7; overflow-x: auto; position: relative; }
+      .terminal::before { content: "● ● ●"; position: absolute; top: clamp(0.4rem, 0.8vw, 0.6rem); left: clamp(0.6rem, 1.2vw, 0.8rem); font-size: 0.6em; letter-spacing: 0.3em; color: var(--text-dim); }
+      .terminal pre { padding-top: 1.2em; white-space: pre; }
+      .t-dim { color: var(--text-dim); }
+      .t-accent { color: var(--accent-bright); }
+      .t-green { color: var(--green); }
+      .t-yellow { color: var(--yellow); }
+      .t-red { color: var(--red); }
+      .t-blue { color: var(--blue); }
+
+      /* Comparison */
+      .compare { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.5rem, 1.5vw, 1rem); }
+      .compare-bad { border-top: 3px solid var(--red); }
+      .compare-good { border-top: 3px solid var(--green); }
+
+      /* Pills */
+      .pill-row { display: flex; gap: clamp(0.3rem, 1vw, 0.7rem); flex-wrap: wrap; }
+      .pill { background: rgba(139, 92, 246, 0.07); border: 1px solid rgba(139, 92, 246, 0.15); border-radius: 6px; padding: clamp(0.3rem, 0.8vw, 0.5rem) clamp(0.6rem, 1.2vw, 0.9rem); font-family: var(--font-mono); font-size: var(--small-size); color: var(--accent-bright); font-weight: 600; }
+
+      /* CTA */
+      .cta-row { display: flex; gap: clamp(0.5rem, 1.5vw, 1rem); flex-wrap: wrap; justify-content: center; }
+      .cta { display: inline-flex; align-items: center; gap: 0.4em; padding: clamp(0.5rem, 1.2vw, 0.8rem) clamp(1rem, 2.5vw, 2rem); border-radius: 8px; font-family: var(--font-mono); font-size: var(--small-size); font-weight: 600; text-decoration: none; transition: all 0.2s; }
+      .cta-primary { background: var(--accent); color: white; border: 1px solid var(--accent); }
+      .cta-primary:hover { background: #7c3aed; box-shadow: 0 0 25px var(--accent-glow); }
+      .cta-secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border); }
+      .cta-secondary:hover { border-color: var(--accent); color: var(--accent-bright); }
+
+      /* Command grid */
+      .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: clamp(0.4rem, 1vw, 0.7rem); }
+      .cmd { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: clamp(0.5rem, 1vw, 0.8rem); font-family: var(--font-mono); font-size: var(--code-size); transition: border-color 0.2s; }
+      .cmd:hover { border-color: var(--accent); }
+      .cmd-name { color: var(--accent-bright); font-weight: 600; }
+      .cmd-desc { color: var(--text-dim); font-family: var(--font-display); font-size: var(--small-size); }
+      .cmd-new { position: relative; }
+      .cmd-new::after { content: "NEW"; position: absolute; top: 4px; right: 6px; font-size: 0.5rem; background: var(--accent); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 700; }
+
+      /* Closing */
+      .closing-slide { text-align: center; }
+      .closing-slide .slide-content { align-items: center; }
+      .closing-slide::after { content: ""; position: absolute; bottom: 20%; left: 50%; transform: translate(-50%, 50%); width: min(600px, 100vw); height: min(600px, 100vw); background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%); pointer-events: none; z-index: 0; }
+      .closing-slide > * { position: relative; z-index: 1; }
+      .closing-slide .slide-content { z-index: 1; }
+
+      /* Grid bg */
+      .grid-bg::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+
+      /* Responsive */
+      @media (max-width: 700px) {
+        .compare { grid-template-columns: 1fr; }
+        .stat-row { gap: clamp(1rem, 3vw, 2rem); }
+      }
+
+      /* Reveal animation */
+      .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s var(--ease-out-expo), transform 0.6s var(--ease-out-expo); }
+      .reveal.visible { opacity: 1; transform: translateY(0); }
+    </style>
+  </head>
+  <body>
+
+    <!-- ======= SLIDE 1: TITLE ======= -->
+    <section class="slide title-slide" data-slide="0">
+      <div class="slide-content">
+        <img src="vulture.png" alt="intel4s" width="200" class="reveal" style="filter: drop-shadow(0 0 30px var(--accent-glow));">
+        <h1 class="reveal">intel<span class="accent">4s</span></h1>
+        <p class="title-tagline reveal">
+          Code intelligence for Scala.<br>
+          <strong>Works without a build. Gets smarter when you compile.</strong>
+        </p>
+        <div class="stat-row reveal">
+          <div class="stat-item"><div class="stat-value">36</div><div class="stat-label">Commands</div></div>
+          <div class="stat-item"><div class="stat-value">528</div><div class="stat-label">Tests</div></div>
+          <div class="stat-item"><div class="stat-value">&lt;400ms</div><div class="stat-label">Warm Query</div></div>
+          <div class="stat-item"><div class="stat-value">hybrid</div><div class="stat-label">Text + Semantic</div></div>
+        </div>
+        <div class="pill-row reveal" style="margin-top: var(--content-gap)">
+          <div class="pill">MCP Native</div>
+          <div class="pill">Cursor</div>
+          <div class="pill">Windsurf</div>
+          <div class="pill">Claude Code</div>
+          <div class="pill">Cline</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 2: THE PROBLEM ======= -->
+    <section class="slide content-slide grid-bg" data-slide="1">
+      <span class="slide-number">01</span>
+      <div class="slide-content">
+        <h2 class="reveal">Three <span class="red">bad</span> options for AI agents.</h2>
+        <div class="card-grid reveal">
+          <div class="card" style="border-top: 3px solid var(--red)">
+            <h3><span class="red">grep</span> — fast but blind</h3>
+            <p>Returns raw text. <span class="mono">class Config</span> matches <span class="mono">ConfigStore</span>, <span class="mono">ConfigParser</span>. Two packages with <span class="mono">Config</span>? grep hits both.</p>
+          </div>
+          <div class="card" style="border-top: 3px solid var(--yellow)">
+            <h3><span style="color:var(--yellow)">Metals LSP</span> — smart but heavy</h3>
+            <p>Requires build server, full compilation, minutes of startup. Designed for humans in IDEs, not agents making 50 tool calls per task.</p>
+          </div>
+          <div class="card" style="border-top: 3px solid var(--text-dim)">
+            <h3><span style="color:var(--text-dim)">Text-only tools</span> — better grep</h3>
+            <p>Word-boundary matching beats grep, but still can't distinguish <span class="mono">app.Config</span> from <span class="mono">db.Config</span>. No type awareness.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 3: THE HYBRID ADVANTAGE ======= -->
+    <section class="slide content-slide" data-slide="2">
+      <span class="slide-number">02</span>
+      <div class="slide-content">
+        <h2 class="reveal">The <span class="accent">hybrid</span> advantage.</h2>
+        <p class="subtitle reveal">Text-based by default. Type-aware when compiled. One flag: <span class="mono accent">--semantic</span>.</p>
+        <div class="compare reveal">
+          <div class="terminal compare-bad">
+            <pre><span class="t-dim">$ intel4s rename Config AppConfig</span>
+
+<span class="t-red">6 edits in 3 files</span>  ← hits BOTH packages
+
+  src/App.scala
+    <span class="t-red">Config → AppConfig</span>   ✓ correct
+  src/Db.scala
+    <span class="t-red">Config → AppConfig</span>   ✗ WRONG package!</pre>
+          </div>
+          <div class="terminal compare-good">
+            <pre><span class="t-dim">$ intel4s rename Config AppConfig <span class="t-accent">--semantic</span></span>
+
+<span class="t-green">2 edits in 1 file</span>   ← only app.Config
+
+<span class="t-dim">2 symbols named 'Config'. Renaming only:</span>
+  <span class="t-accent">app/Config#</span>
+<span class="t-dim">Untouched:</span>
+  <span class="t-dim">db/Config#</span></pre>
+          </div>
+        </div>
+        <p class="reveal" style="color: var(--text-dim); text-align: center; margin-top: 0.5em; font-size: var(--small-size)">
+          Enable: <span class="mono">-Xsemanticdb</span> (Scala 3) &nbsp;|&nbsp; <span class="mono">semanticdbEnabled := true</span> (sbt) &nbsp;|&nbsp; Metals: automatic
+        </p>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 4: KEY COMMANDS ======= -->
+    <section class="slide content-slide grid-bg" data-slide="3">
+      <span class="slide-number">03</span>
+      <div class="slide-content">
+        <h2 class="reveal">What <span class="accent">no other CLI</span> can do.</h2>
+        <div class="card-grid reveal">
+          <div class="card">
+            <h3><span class="accent">rename</span> <span class="mono" style="font-size:0.7em">--semantic</span></h3>
+            <p>Type-aware rename. Two Config in different packages → only renames the right one. Word-boundary safe.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">call-graph</span></h3>
+            <p>Bidirectional: what a method calls (callees) + who calls it (callers). With --semantic: compiler-precise callees.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">unused</span></h3>
+            <p>Dead code detection. Bloom filter pre-screen + text verification. Finds symbols with zero external refs.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">scaffold impl</span></h3>
+            <p>Generate override stubs with type parameter substitution. <span class="mono">T → User</span> resolved automatically.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">explain</span></h3>
+            <p>One-shot: definition + doc + members + implementations + imports. Saves 4-5 tool calls.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">refs</span> <span class="mono" style="font-size:0.7em">--semantic</span></h3>
+            <p>Type-aware references when SemanticDB is available. Disambiguates same-named symbols across packages.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 5: CALL GRAPH DEMO ======= -->
+    <section class="slide content-slide" data-slide="4">
+      <span class="slide-number">04</span>
+      <div class="slide-content">
+        <h2 class="reveal">See the <span class="accent">flow</span>.</h2>
+        <p class="subtitle reveal">One command. Both directions.</p>
+        <div class="terminal reveal">
+          <pre><span class="t-dim">$ intel4s call-graph processPayment --in PaymentService --semantic</span>
+
+Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/Payment.scala:15)
+
+  <span class="t-green">Calls (3):</span>
+    def  <span class="t-accent">validate</span>     (com.example) — src/Validator.scala:8
+    def  <span class="t-accent">charge</span>       (com.billing) — src/Billing.scala:22
+    def  <span class="t-accent">notifyUser</span>   (com.notify)  — src/Notifier.scala:5
+
+  <span class="t-yellow">Called by (4):</span>
+    src/Handler.scala:30  — svc.processPayment(amount)
+    src/BatchJob.scala:15 — payments.foreach(processPayment)
+    src/API.scala:42      — service.processPayment(req.amount)
+    src/Test.scala:8      — svc.processPayment(BigDecimal("9.99"))</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 6: ALL 36 COMMANDS ======= -->
+    <section class="slide content-slide grid-bg" data-slide="5">
+      <span class="slide-number">05</span>
+      <div class="slide-content">
+        <h2 class="reveal"><span class="accent">36</span> commands.</h2>
+        <div class="cmd-grid reveal">
+          <div class="cmd cmd-new"><span class="cmd-name">rename</span><br><span class="cmd-desc">Safe rename (semantic)</span></div>
+          <div class="cmd cmd-new"><span class="cmd-name">call-graph</span><br><span class="cmd-desc">Bidirectional flow</span></div>
+          <div class="cmd cmd-new"><span class="cmd-name">unused</span><br><span class="cmd-desc">Dead code detection</span></div>
+          <div class="cmd cmd-new"><span class="cmd-name">scaffold impl</span><br><span class="cmd-desc">Override stubs</span></div>
+          <div class="cmd cmd-new"><span class="cmd-name">scaffold test</span><br><span class="cmd-desc">Test skeleton</span></div>
+          <div class="cmd"><span class="cmd-name">explain</span><br><span class="cmd-desc">One-shot summary</span></div>
+          <div class="cmd"><span class="cmd-name">refs</span><br><span class="cmd-desc">Categorized refs</span></div>
+          <div class="cmd"><span class="cmd-name">hierarchy</span><br><span class="cmd-desc">Inheritance tree</span></div>
+          <div class="cmd"><span class="cmd-name">members</span><br><span class="cmd-desc">API surface</span></div>
+          <div class="cmd"><span class="cmd-name">body</span><br><span class="cmd-desc">Extract source</span></div>
+          <div class="cmd"><span class="cmd-name">imports</span><br><span class="cmd-desc">Wildcard-aware</span></div>
+          <div class="cmd"><span class="cmd-name">search</span><br><span class="cmd-desc">Fuzzy camelCase</span></div>
+          <div class="cmd"><span class="cmd-name">def</span><br><span class="cmd-desc">Find definition</span></div>
+          <div class="cmd"><span class="cmd-name">impl</span><br><span class="cmd-desc">Find implementations</span></div>
+          <div class="cmd"><span class="cmd-name">overview</span><br><span class="cmd-desc">Codebase map</span></div>
+          <div class="cmd"><span class="cmd-name">api</span><br><span class="cmd-desc">Public surface</span></div>
+          <div class="cmd"><span class="cmd-name">deps</span><br><span class="cmd-desc">Dependencies</span></div>
+          <div class="cmd"><span class="cmd-name">mcp</span><br><span class="cmd-desc">MCP server</span></div>
+        </div>
+        <p class="reveal" style="color: var(--text-dim); text-align: center; font-size: var(--small-size); margin-top: 0.5em">
+          + 18 more: grep, diff, tests, coverage, ast-pattern, overrides, doc, context, batch, packages, package, summary, entrypoints, annotated, file, symbols, index, graph
+        </p>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 7: BENCHMARKS ======= -->
+    <section class="slide content-slide" data-slide="6">
+      <span class="slide-number">06</span>
+      <div class="slide-content">
+        <h2 class="reveal">Performance <span class="accent">at scale</span>.</h2>
+        <div class="terminal reveal">
+          <pre>
+<span class="t-dim">Project                 Files    Symbols    Cold     Warm</span>
+<span class="t-accent">Production monorepo</span>    14,219   170,094    5.3s    445ms
+<span class="t-accent">Scala 3 compiler</span>       18,485   144,211    2.7s    349ms</pre>
+        </div>
+        <div class="card-grid reveal" style="margin-top: var(--content-gap)">
+          <div class="card">
+            <h3><span class="accent">1,206</span> <span style="color:var(--text-dim)">vs 17</span></h3>
+            <p>Importers found for <span class="mono">Compiler</span>. intel4s resolves wildcard imports. grep misses 98.6%.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">283</span> refs, <span class="green">categorized</span></h3>
+            <p>Definition, ExtendedBy, ImportedBy, UsedAsType, Usage, Comment — ranked by confidence.</p>
+          </div>
+          <div class="card">
+            <h3><span class="accent">0</span> false renames</h3>
+            <p>Semantic rename with SemanticDB. Two Config in different packages → only the right one.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 8: INSTALL ======= -->
+    <section class="slide content-slide grid-bg" data-slide="7">
+      <span class="slide-number">07</span>
+      <div class="slide-content">
+        <h2 class="reveal">Works <span class="accent">everywhere</span>.</h2>
+        <div class="compare reveal">
+          <div class="terminal">
+            <pre><span class="t-dim">MCP Server (Cursor, Windsurf, Cline)</span>
+
+{
+  "<span class="t-accent">mcpServers</span>": {
+    "<span class="t-green">intel4s</span>": {
+      "type": "stdio",
+      "command": "/path/to/intel4s",
+      "args": ["mcp"]
+    }
+  }
+}</pre>
+          </div>
+          <div class="terminal">
+            <pre><span class="t-dim">Claude Code</span>
+
+<span class="t-accent">$</span> /plugin install intel4s
+
+<span class="t-dim">Then ask:</span>
+<span class="t-green">"use intel4s to explore how
+ authentication works"</span>
+
+<span class="t-dim">The agent orchestrates 5-7
+ commands autonomously.</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= SLIDE 9: CLOSING ======= -->
+    <section class="slide closing-slide" data-slide="8">
+      <div class="slide-content">
+        <h1 class="reveal">intel<span class="accent">4s</span></h1>
+        <p class="title-tagline reveal">
+          Works without a build.<br>
+          <strong>Gets smarter when you compile.</strong>
+        </p>
+        <div class="cta-row reveal">
+          <a href="https://github.com/YOUR_USERNAME/intel4s" class="cta cta-primary">GitHub →</a>
+          <a href="https://github.com/YOUR_USERNAME/intel4s/releases" class="cta cta-secondary">Releases</a>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // Reveal on scroll
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            const els = e.target.querySelectorAll('.reveal');
+            els.forEach((el, i) => {
+              setTimeout(() => el.classList.add('visible'), i * 80);
+            });
+          }
+        });
+      }, { threshold: 0.3 });
+      document.querySelectorAll('.slide').forEach(s => observer.observe(s));
+      // Trigger first slide immediately
+      document.querySelectorAll('.slide[data-slide="0"] .reveal').forEach(el => el.classList.add('visible'));
+    </script>
+  </body>
+</html>
