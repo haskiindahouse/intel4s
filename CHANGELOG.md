@@ -2,7 +2,7 @@
 
 All notable changes to intel4s are documented here.
 
-## [Unreleased]
+## [0.2.0] — 2026-03-27
 
 ### Added
 

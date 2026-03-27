@@ -12,7 +12,7 @@
       "name": "intel4s",
       "source": "./plugins/scalex",
       "description": "Code intelligence for Scala. Semantic rename, call-graph, dead code detection, scaffolding. Works without a build server — type-aware when compiled. 36 commands, MCP native.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "haskiindahouse"
       },
