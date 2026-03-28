@@ -7,14 +7,14 @@ if [ -z "${BASH_VERSION:-}" ] && [ -f "$0" ]; then
 fi
 set -euo pipefail
 
-EXPECTED_VERSION="0.1.0"
+EXPECTED_VERSION="0.4.0"
 REPO="haskiindahouse/intel4s"
 
 # Expected SHA-256 checksums for each artifact (updated each release alongside EXPECTED_VERSION)
 # Will be populated after first release build
-CHECKSUM_scalex_macos_arm64="4100c75633dde040b4266b8a6609ac39ef3d6a056341e7d1b0be90d6f32141e1"
-CHECKSUM_scalex_macos_x64="c29e32dd3ef115fdb4e3cf106bd2cd95a5bba9f91e37350b806241aa37929cfa"
-CHECKSUM_scalex_linux_x64="c9be1856672d055a32c985f4a5ed7b4fbb4ef4ce90a86a0fbd39188a11a346d9"
+CHECKSUM_scalex_macos_arm64="c421198205cfc21ab4808b5902df7291d7f87d9711d1a382adb637f0c30728d4"
+CHECKSUM_scalex_macos_x64="0dc318a9d8e8f8a5118cbac0f982edf30aabc8db8405d4bfa39704241e835220"
+CHECKSUM_scalex_linux_x64="d874a01ef5b07b67e299aa22cc83c609bcd609ef3b6e25db19aa6c85fc8c09ad"
 
 # Cache location: follow XDG spec
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/intel4s"
