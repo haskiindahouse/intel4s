@@ -409,7 +409,8 @@ def analyzeTaint(
     BugPattern.FragmentConst, BugPattern.SpliceInterpolation,
     BugPattern.ObjectInputStream, BugPattern.JacksonDefaultTyping, BugPattern.HardcodedSecret,
     BugPattern.CommandInjection, BugPattern.PathTraversal, BugPattern.XSS,
-    BugPattern.OpenRedirect, BugPattern.SSRF)
+    BugPattern.OpenRedirect, BugPattern.SSRF,
+    BugPattern.XXE, BugPattern.XPathInjection, BugPattern.RegexDoS, BugPattern.LDAPInjection)
   if !sinkPatterns.contains(finding.pattern) then Some(finding)
   else
     // Find the AST node at the finding's line

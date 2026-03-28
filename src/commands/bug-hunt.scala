@@ -25,7 +25,14 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
     "succeed", "Await", "sleep", "sender", "Fragment", "ObjectInputStream",
     "enableDefaultTyping", "password", "secret", "token", "apiKey", "fromFile",
     "exec", "ProcessBuilder", "Process", "File", "Paths", "Html", "Redirect",
-    "singleRequest", "fromURL")
+    "singleRequest", "fromURL",
+    "MessageDigest", "Cipher", "Random", "IvParameterSpec",
+    "SAXParser", "DocumentBuilderFactory", "SAXParserFactory", "XMLInputFactory", "XPath",
+    "die", "unsafeRun", "unsafe", "onComplete",
+    "synchronized", "mutable",
+    "tail", "Pattern",
+    "FileInputStream", "FileOutputStream", "BufferedReader", "BufferedWriter",
+    "Connection", "PreparedStatement", "Statement", "ResultSet")
 
   val bloomCandidates = candidates.filter { f =>
     f.identifierBloom match
@@ -240,6 +247,86 @@ private def scanFile(
         if argClause.values.exists(!isLiteralArg(_)) =>
         report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SSRF, context)
 
+      // ── Weak cryptography ──
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("MessageDigest"), Term.Name("getInstance")), argClause)
+        if argClause.values.exists(a => isWeakHash(a.toString)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.WeakHash, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Cipher"), Term.Name("getInstance")), argClause)
+        if argClause.values.exists(a => isWeakCipher(a.toString)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.WeakCipher, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Cipher"), Term.Name("getInstance")), argClause)
+        if argClause.values.exists(_.toString.contains("ECB")) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.ECBMode, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Cipher"), Term.Name("getInstance")), argClause)
+        if argClause.values.exists(_.toString.contains("NoPadding")) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.NoPadding, context)
+      case n @ Init.After_4_6_0(Type.Name("Random"), _, _) =>
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.WeakRandom, context)
+      case app @ Term.Apply.After_4_6_0(Term.New(Init.After_4_6_0(Type.Name("Random"), _, _)), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.WeakRandom, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("IvParameterSpec"), Term.Name("apply")), argClause)
+        if argClause.values.exists(isLiteralArg) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.HardcodedIV, context)
+      case n @ Init.After_4_6_0(Type.Name("IvParameterSpec"), _, argClauses)
+        if argClauses.flatMap(_.values).exists(a => a.toString.contains("getBytes")) =>
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.HardcodedIV, context)
+
+      // ── XML/XXE ──
+      case n @ Init.After_4_6_0(Type.Name("SAXParser"), _, _) =>
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.XXE, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("DocumentBuilderFactory"), Term.Name("newInstance")), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.XXE, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("SAXParserFactory"), Term.Name("newInstance")), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.XXE, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("XMLInputFactory"), Term.Name("newInstance")), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.XXE, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("evaluate")), argClause)
+        if app.toString.contains("XPath") && argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.XPathInjection, context)
+
+      // ── Logging injection ──
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name(logMethod)), argClause)
+        if Set("info", "warn", "error", "debug", "trace").contains(logMethod) &&
+           argClause.values.exists(isStringInterpolation) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.LogInjection, context)
+
+      // ── ZIO / effect-specific ──
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("ZIO"), Term.Name("die")), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.ZioDie, context)
+      case app @ Term.Apply.After_4_6_0(Term.Name("unsafeRun"), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.UnsafeRun, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Unsafe"), Term.Name("unsafe")), _) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.UnsafeRun, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("onComplete")), _)
+        if context.contains("Future") || app.toString.contains("Future") =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.FutureOnComplete, context)
+
+      // ── Concurrency extended ──
+      case app @ Term.ApplyInfix.After_4_6_0(_, Term.Name("synchronized"), _, _)
+        if context.contains("synchronized") =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SynchronizedNested, context)
+      case app @ Term.Apply.After_4_6_0(Term.Name("synchronized"), _)
+        if context.contains("synchronized") =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SynchronizedNested, context)
+
+      // ── Type safety extended ──
+      case sel @ Term.Select(_, Term.Name("tail")) if !context.contains("assertion") =>
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionLast, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Pattern"), Term.Name("compile")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.RegexDoS, context)
+
+      // ── Resource management ──
+      case n @ Init.After_4_6_0(Type.Name(typeName), _, _)
+        if Set("FileInputStream", "FileOutputStream", "BufferedReader", "BufferedWriter",
+               "PrintWriter", "DataInputStream", "DataOutputStream").contains(typeName) &&
+           !context.contains("Using") && !context.contains("try") =>
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.StreamNotClosed, context)
+      case n @ Init.After_4_6_0(Type.Name(typeName), _, _)
+        if Set("Connection", "PreparedStatement", "Statement", "ResultSet").contains(typeName) &&
+           !context.contains("Using") && !context.contains("try") =>
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.ConnectionLeak, context)
+
       case _ => ()
 
     // Recurse into children with updated context
@@ -267,6 +354,8 @@ private def scanFile(
         // Track assertion context — .head/.last inside assertions are test patterns, not bugs
         case Term.Apply.After_4_6_0(Term.Name(n), _) if assertionNames.contains(n) => "assertion" :: context
         case Term.Apply.After_4_6_0(Term.Select(_, Term.Name(n)), _) if assertionNames.contains(n) => "assertion" :: context
+        // Track synchronized for nested synchronized detection
+        case Term.Apply.After_4_6_0(Term.Name("synchronized"), _) => "synchronized" :: context
         case _ => context
       scan(child, newCtx)
     }
@@ -352,6 +441,14 @@ private val assertionNames = Set(
   "expect", "check", "verify",
   "yield" // for-yield with assertTrue in ZIO test
 )
+
+private def isWeakHash(s: String): Boolean =
+  val lower = s.toLowerCase
+  lower.contains("md5") || lower.contains("sha-1") || lower.contains("sha1")
+
+private def isWeakCipher(s: String): Boolean =
+  val lower = s.toLowerCase
+  lower.contains("des") || lower.contains("rc4") || lower.contains("blowfish")
 
 private def isStringInterpolation(t: Tree): Boolean = t match
   case Term.Interpolate(_, _, _) => true

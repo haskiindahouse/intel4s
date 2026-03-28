@@ -164,6 +164,38 @@ enum BugPattern(val severity: BugSeverity, val category: BugCategory, val descri
   case XSS               extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Html() with non-literal arg — cross-site scripting")
   case OpenRedirect       extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Redirect with non-literal URL — open redirect")
   case SSRF              extends BugPattern(BugSeverity.High,     BugCategory.Security,     "HTTP request with non-literal URL — server-side request forgery")
+  // ── Weak cryptography ──
+  case WeakHash          extends BugPattern(BugSeverity.High,     BugCategory.Security,     "MD5/SHA1 hash — cryptographically broken, use SHA-256+")
+  case WeakCipher        extends BugPattern(BugSeverity.High,     BugCategory.Security,     "DES/RC4/Blowfish cipher — broken, use AES-256")
+  case WeakRandom        extends BugPattern(BugSeverity.High,     BugCategory.Security,     "java.util.Random for security — use SecureRandom")
+  case HardcodedIV       extends BugPattern(BugSeverity.High,     BugCategory.Security,     "hardcoded IV/nonce in crypto — must be random per encryption")
+  case ECBMode           extends BugPattern(BugSeverity.High,     BugCategory.Security,     "ECB cipher mode — patterns visible in ciphertext, use CBC/GCM")
+  case NoPadding         extends BugPattern(BugSeverity.Medium,   BugCategory.Security,     "NoPadding with block cipher — potential padding oracle")
+  // ── XML/XXE ──
+  case XXE               extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "XML parsing without disabling external entities — XXE attack")
+  case XPathInjection    extends BugPattern(BugSeverity.High,     BugCategory.Security,     "XPath with non-literal expression — XPath injection")
+  // ── Logging ──
+  case LogInjection      extends BugPattern(BugSeverity.Medium,   BugCategory.Security,     "user input in log message — log injection / log forging")
+  // ── ZIO / effect-specific ──
+  case ZioDie            extends BugPattern(BugSeverity.High,     BugCategory.Effect,       "ZIO.die in production code — unrecoverable defect, prefer fail")
+  case UnsafeRun         extends BugPattern(BugSeverity.High,     BugCategory.Effect,       "Unsafe.unsafe / unsafeRun — breaks referential transparency")
+  case BlockingInEffect  extends BugPattern(BugSeverity.High,     BugCategory.Effect,       "blocking call inside ZIO/IO — use ZIO.attemptBlocking")
+  case IgnoredFuture     extends BugPattern(BugSeverity.Medium,   BugCategory.Effect,       "Future result discarded — errors silently swallowed")
+  case FutureOnComplete  extends BugPattern(BugSeverity.Medium,   BugCategory.Effect,       "Future.onComplete ignoring Failure — silent error swallowing")
+  // ── Concurrency extended ──
+  case SynchronizedNested extends BugPattern(BugSeverity.High,    BugCategory.Concurrency,  "nested synchronized blocks — potential deadlock")
+  case VarInConcurrent   extends BugPattern(BugSeverity.High,     BugCategory.Concurrency,  "var field in class with Future/ZIO — race condition risk")
+  case MutableShared     extends BugPattern(BugSeverity.Medium,   BugCategory.Concurrency,  "mutable collection in object/class field — thread-safety risk")
+  // ── Type safety extended ──
+  case CollectionLast    extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   ".tail on collection — throws on empty collection")
+  case UnsafeGet         extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   "Try.get / Future.value.get — throws on failure")
+  case PartialFunction   extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   "match without default case on non-sealed type — MatchError risk")
+  // ── Resource management ──
+  case ConnectionLeak    extends BugPattern(BugSeverity.High,     BugCategory.Resource,     "Connection/Statement opened without close — connection leak")
+  case StreamNotClosed   extends BugPattern(BugSeverity.Medium,   BugCategory.Resource,     "InputStream/OutputStream without close — resource leak")
+  // ── Regex ──
+  case RegexDoS          extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Regex compiled from user input — ReDoS (regex denial of service)")
+  case LDAPInjection     extends BugPattern(BugSeverity.High,     BugCategory.Security,     "LDAP query with non-literal filter — LDAP injection")
 
 case class BugFinding(
   file: Path,
