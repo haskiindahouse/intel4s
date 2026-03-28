@@ -448,6 +448,7 @@ These commands are fully documented in `references/commands.md` (next to this SK
 | `index` | Force reindex (rarely needed) | |
 | `graph --render "A->B"` | Render directed graph as ASCII/Unicode art (**only when user explicitly asks**) | `--unicode`, `--vertical`, `--rounded`, `--double` |
 | `graph --parse` | Parse ASCII diagram from stdin into boxes+edges (**only when user explicitly asks**) | `--json` |
+| `bug-hunt` | Scan for common bug patterns and vulnerabilities | `--severity`, `--bug-category`, `--hotspots` |
 | `mcp` | Start MCP server (JSON-RPC over stdio) for Cursor/Windsurf/Cline | |
 
 **Important**: The `graph` command should only be used when the user explicitly asks to draw or visualize a graph — never run it automatically as part of other workflows.

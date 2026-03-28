@@ -43,13 +43,17 @@ case class ParsedFlags(
   eachMethod: Boolean = false,
   semantic: Boolean = false,
   framework: String = "munit",
+  bugSeverity: Option[String] = None,
+  bugCategory: Option[String] = None,
+  hotspots: Boolean = false,
+  noTaint: Boolean = false,
   cleanArgs: List[String] = Nil,
 )
 
 private val flagsWithArgs = Set("--limit", "--kind", "--workspace", "-w", "--path", "--exclude-path", "-C", "-e", "--category",
                          "--in", "--of", "--impl-limit", "--depth", "--has-method", "--extends", "--body-contains", "--focus-package", "--expand",
                          "--members-limit", "--used-by", "--returns", "--takes", "--top", "--max-lines", "--offset",
-                         "--max-output", "--in-package", "--framework")
+                         "--max-output", "--in-package", "--framework", "--severity", "--bug-category")
 
 def parseFlags(argList: List[String]): ParsedFlags =
   val limit = argList.indexOf("--limit") match
@@ -165,6 +169,14 @@ def parseFlags(argList: List[String]): ParsedFlags =
   val framework: String = argList.indexOf("--framework") match
     case -1 => "munit"
     case i => argList.lift(i + 1).getOrElse("munit")
+  val bugSeverity: Option[String] = argList.indexOf("--severity") match
+    case -1 => None
+    case i => argList.lift(i + 1)
+  val bugCategory: Option[String] = argList.indexOf("--bug-category") match
+    case -1 => None
+    case i => argList.lift(i + 1)
+  val hotspots = argList.contains("--hotspots")
+  val noTaint = argList.contains("--no-taint")
 
   val cleanArgs = argList.filterNot(a => a.startsWith("--") || a == "-w" || a == "-C" || a == "-e" || a == "-c" || {
     val prev = argList.indexOf(a) - 1
@@ -177,7 +189,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     hasMethodFilter, extendsFilter, bodyContainsFilter, focusPackage, expandDepth, membersLimit,
     brief, strict, usedByFilter, returnsFilter, takesFilter, shallow, noDoc, excludePath, topN,
     summaryMode, timingsEnabled, withBody, maxBodyLines, showImports, offset, related, explainMode,
-    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, cleanArgs)
+    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, bugSeverity, bugCategory, hotspots, noTaint, cleanArgs)
 
 private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
                            batchMode: Boolean = false, effectiveNoTests: Option[Boolean] = None): CommandContext =
@@ -200,7 +212,11 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
     maxOutput = f.maxOutput, inPackageFilter = f.inPackageFilter,
     eachMethod = f.eachMethod,
     semantic = f.semantic,
-    framework = f.framework)
+    framework = f.framework,
+    bugSeverity = f.bugSeverity,
+    bugCategory = f.bugCategory,
+    hotspots = f.hotspots,
+    noTaint = f.noTaint)
 
 @main def main(args: String*): Unit =
   val f = parseFlags(args.toList)
@@ -250,6 +266,7 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  scalex call-graph <method>      Show what a method calls and who calls it
         |  scalex scaffold impl <class>    Generate stubs for unimplemented abstract members
         |  scalex scaffold test <class>    Generate test suite skeleton
+        |  scalex bug-hunt                 Scan for common bug patterns and vulnerabilities
         |  scalex graph --render "A->B"    Render directed graph as ASCII/Unicode art
         |  scalex graph --parse            Parse ASCII diagram from stdin into boxes+edges
         |  scalex mcp                      Start MCP server (JSON-RPC over stdio)
@@ -309,6 +326,10 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  --in-package PKG      Filter results to files whose package matches PKG prefix
         |  --semantic            Refs/rename: use SemanticDB for type-aware refs (requires compiled project)
         |  --framework NAME     Scaffold test: test framework (munit, scalatest, zio-test; default: munit)
+        |  --severity LEVEL     Bug-hunt: minimum severity (critical, high, medium; default: all)
+        |  --bug-category CAT   Bug-hunt: filter by category (security, type-safety, concurrency, resource, effect)
+        |  --hotspots           Bug-hunt: compute complexity x git-churn hotspot ranking
+        |  --no-taint           Bug-hunt: disable taint analysis (faster, more false positives)
         |  --timings             Print per-phase timing breakdown to stderr
         |
         |All commands accept an optional [workspace] positional arg or -w flag (default: current directory).

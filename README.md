@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-  <a href="#commands"><img src="https://img.shields.io/badge/commands-36-brightgreen.svg" alt="36 Commands"></a>
+  <a href="#commands"><img src="https://img.shields.io/badge/commands-37-brightgreen.svg" alt="37 Commands"></a>
   <a href="#benchmarks"><img src="https://img.shields.io/badge/tests-528_passing-brightgreen.svg" alt="528 Tests"></a>
   <a href="#semantic-mode"><img src="https://img.shields.io/badge/SemanticDB-hybrid-blueviolet.svg" alt="SemanticDB Hybrid"></a>
 </p>
@@ -26,7 +26,7 @@ Like [Metals](https://scalameta.org/metals/), but without the build server. Like
 
 - **Hybrid intelligence.** Text-based by default — no build needed. Add `-Xsemanticdb` to your compiler and get type-aware refs, rename, and call-graph. Works in both modes, automatically.
 - **Semantic rename.** Two classes named `Config` in different packages? `rename --semantic` only renames the right one. grep can't. Even IntelliJ sometimes gets this wrong.
-- **36 commands, one tool call each.** `explain` returns definition + docs + members + implementations in one shot. Saves 4-5 round trips for AI agents.
+- **37 commands, one tool call each.** `explain` returns definition + docs + members + implementations in one shot. Saves 4-5 round trips for AI agents.
 - **MCP native.** Works with Cursor, Windsurf, Cline, Claude Code out of the box. One config line.
 - **Dead code detection.** `unused` finds symbols with zero external references. Bloom filter pre-screen + text verification. No compiler needed.
 - **Call graph.** `call-graph` shows what a method calls and who calls it. Bidirectional, in one command.
@@ -179,6 +179,8 @@ intel4s refs UserService --semantic         # type-aware references
 intel4s call-graph processPayment --in Svc  # what it calls + who calls it
 intel4s call-graph processPayment --semantic --in Svc  # compiler-precise callees
 intel4s unused com.legacy                   # dead code detection
+intel4s bug-hunt --hotspots                 # scan for bugs & vulnerabilities
+intel4s bug-hunt --severity critical        # security-only (SQL injection, deserialization)
 intel4s coverage UserService                # is this tested?
 intel4s deps Phase --depth 2                # transitive dependencies
 ```
@@ -202,7 +204,7 @@ intel4s graph --render "A->B, B->C"         # ASCII graph art
 ```
 
 <details>
-<summary><strong>All 36 commands</strong></summary>
+<summary><strong>All 37 commands</strong></summary>
 
 ```
 search          Search symbols by name (fuzzy camelCase)
@@ -237,6 +239,7 @@ batch           Multiple queries, one index load
 rename          Safe rename across codebase
 unused          Dead code detection
 call-graph      Bidirectional method call graph
+bug-hunt        Scan for bug patterns & vulnerabilities
 scaffold impl   Generate implementation stubs
 scaffold test   Generate test skeleton
 graph           ASCII/Unicode graph rendering
