@@ -46,6 +46,7 @@ case class ParsedFlags(
   bugSeverity: Option[String] = None,
   bugCategory: Option[String] = None,
   hotspots: Boolean = false,
+  noTaint: Boolean = false,
   cleanArgs: List[String] = Nil,
 )
 
@@ -175,6 +176,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     case -1 => None
     case i => argList.lift(i + 1)
   val hotspots = argList.contains("--hotspots")
+  val noTaint = argList.contains("--no-taint")
 
   val cleanArgs = argList.filterNot(a => a.startsWith("--") || a == "-w" || a == "-C" || a == "-e" || a == "-c" || {
     val prev = argList.indexOf(a) - 1
@@ -187,7 +189,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     hasMethodFilter, extendsFilter, bodyContainsFilter, focusPackage, expandDepth, membersLimit,
     brief, strict, usedByFilter, returnsFilter, takesFilter, shallow, noDoc, excludePath, topN,
     summaryMode, timingsEnabled, withBody, maxBodyLines, showImports, offset, related, explainMode,
-    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, bugSeverity, bugCategory, hotspots, cleanArgs)
+    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, bugSeverity, bugCategory, hotspots, noTaint, cleanArgs)
 
 private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
                            batchMode: Boolean = false, effectiveNoTests: Option[Boolean] = None): CommandContext =
@@ -213,7 +215,8 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
     framework = f.framework,
     bugSeverity = f.bugSeverity,
     bugCategory = f.bugCategory,
-    hotspots = f.hotspots)
+    hotspots = f.hotspots,
+    noTaint = f.noTaint)
 
 @main def main(args: String*): Unit =
   val f = parseFlags(args.toList)
@@ -326,6 +329,7 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
         |  --severity LEVEL     Bug-hunt: minimum severity (critical, high, medium; default: all)
         |  --bug-category CAT   Bug-hunt: filter by category (security, type-safety, concurrency, resource, effect)
         |  --hotspots           Bug-hunt: compute complexity x git-churn hotspot ranking
+        |  --no-taint           Bug-hunt: disable taint analysis (faster, more false positives)
         |  --timings             Print per-phase timing breakdown to stderr
         |
         |All commands accept an optional [workspace] positional arg or -w flag (default: current directory).

@@ -23,7 +23,9 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
   // Phase 1: Bloom filter pre-screen — skip files that definitely don't contain target identifiers
   val bloomKeywords = List("get", "head", "last", "asInstanceOf", "null", "return",
     "succeed", "Await", "sleep", "sender", "Fragment", "ObjectInputStream",
-    "enableDefaultTyping", "password", "secret", "token", "apiKey", "fromFile")
+    "enableDefaultTyping", "password", "secret", "token", "apiKey", "fromFile",
+    "exec", "ProcessBuilder", "Process", "File", "Paths", "Html", "Redirect",
+    "singleRequest", "fromURL")
 
   val bloomCandidates = candidates.filter { f =>
     f.identifierBloom match
@@ -36,10 +38,13 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
   val deadline = System.nanoTime() + 20_000_000_000L // 20 second timeout
   @volatile var timedOut = false
 
+  val enableTaint = !ctx.noTaint
+  val idxForTaint = if enableTaint then Some(ctx.idx) else None
+
   bloomCandidates.asJava.parallelStream().forEach { idxFile =>
     if System.nanoTime() < deadline then
       val filePath = workspace.resolve(idxFile.relativePath)
-      try scanFile(filePath, idxFile.relativePath, findings)
+      try scanFile(filePath, idxFile.relativePath, findings, enableTaint, idxForTaint, workspace)
       catch case _: Exception => () // skip unparseable files
     else timedOut = true
   }
@@ -91,7 +96,10 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
 
 // ── AST scanner ────────────────────────────────────────────────────────────
 
-private def scanFile(filePath: Path, relPath: String, findings: java.util.concurrent.ConcurrentLinkedQueue[BugFinding]): Unit =
+private def scanFile(
+  filePath: Path, relPath: String, findings: java.util.concurrent.ConcurrentLinkedQueue[BugFinding],
+  enableTaint: Boolean = false, idx: Option[WorkspaceIndex] = None, workspace: Path = null
+): Unit =
   val source = try Files.readString(filePath) catch
     case _: java.io.IOException => return
   val lines = source.split('\n')
@@ -107,82 +115,128 @@ private def scanFile(filePath: Path, relPath: String, findings: java.util.concur
       catch
         case _: Exception => return
 
+  // Local buffer for this file's findings (taint post-processes before adding to main queue)
+  val localFindings = java.util.concurrent.ConcurrentLinkedQueue[BugFinding]()
+
   // Track context stack for context-dependent patterns
   def scan(t: Tree, context: List[String]): Unit =
     t match
       // ── .get on Option/Try ──
       case sel @ Term.Select(qual, Term.Name("get")) if !isSafeGet(sel, qual, context) =>
-        report(findings, filePath, relPath, sel.pos, lines, BugPattern.OptionGet, context)
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.OptionGet, context)
 
       // ── .head / .last on collection ──
       case sel @ Term.Select(_, Term.Name("head")) =>
-        report(findings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
       case sel @ Term.Select(_, Term.Name("last")) =>
-        report(findings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
 
       // ── asInstanceOf ──
       case sel @ Term.ApplyType.After_4_6_0(Term.Select(_, Term.Name("asInstanceOf")), _) =>
-        report(findings, filePath, relPath, sel.pos, lines, BugPattern.AsInstanceOf, context)
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.AsInstanceOf, context)
 
       // ── null literal ──
       case n @ Lit.Null() =>
-        report(findings, filePath, relPath, n.pos, lines, BugPattern.NullLiteral, context)
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.NullLiteral, context)
 
       // ── return keyword ──
       case r @ Term.Return(_) =>
         // Only flag if inside a lambda/function body (not top-level def)
         if context.exists(c => c == "lambda" || c == "foreach" || c == "map" || c == "flatMap") then
-          report(findings, filePath, relPath, r.pos, lines, BugPattern.ReturnInLambda, context)
+          report(localFindings, filePath, relPath, r.pos, lines, BugPattern.ReturnInLambda, context)
 
       // ── throw inside ZIO.succeed / UIO ──
       case th @ Term.Throw(_) if context.exists(c => c == "ZIO.succeed" || c == "UIO" || c == "URIO") =>
-        report(findings, filePath, relPath, th.pos, lines, BugPattern.ThrowInZioSucceed, context)
+        report(localFindings, filePath, relPath, th.pos, lines, BugPattern.ThrowInZioSucceed, context)
 
       // ── Await.result with Duration.Inf ──
       case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Await"), Term.Name("result")), argClause)
         if argClause.values.exists(_.toString.contains("Inf")) =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.AwaitInfinite, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.AwaitInfinite, context)
 
       // ── Thread.sleep ──
       case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Thread"), Term.Name("sleep")), _) =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.ThreadSleepAsync, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.ThreadSleepAsync, context)
 
       // ── sender() inside Future ──
       case sel @ Term.Apply.After_4_6_0(Term.Name("sender"), _) if context.contains("Future") =>
-        report(findings, filePath, relPath, sel.pos, lines, BugPattern.SenderInFuture, context)
+        report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.SenderInFuture, context)
 
       // ── Fragment.const with interpolation ──
       case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Fragment"), Term.Name("const")), argClause)
         if argClause.values.exists(isStringInterpolation) =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.FragmentConst, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.FragmentConst, context)
 
       // ── sql"...#$..." splice interpolation ──
       case interp @ Term.Interpolate(Term.Name("sql"), _, _) if interp.toString.contains("#$") =>
-        report(findings, filePath, relPath, interp.pos, lines, BugPattern.SpliceInterpolation, context)
+        report(localFindings, filePath, relPath, interp.pos, lines, BugPattern.SpliceInterpolation, context)
 
       // ── ObjectInputStream ──
       case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("readObject")), _)
         if app.toString.contains("ObjectInputStream") =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.ObjectInputStream, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.ObjectInputStream, context)
       case n @ Init.After_4_6_0(Type.Name("ObjectInputStream"), _, _) =>
-        report(findings, filePath, relPath, n.pos, lines, BugPattern.ObjectInputStream, context)
+        report(localFindings, filePath, relPath, n.pos, lines, BugPattern.ObjectInputStream, context)
 
       // ── enableDefaultTyping ──
       case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("enableDefaultTyping")), _) =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.JacksonDefaultTyping, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.JacksonDefaultTyping, context)
 
       // ── Hardcoded secrets ──
       case Term.Assign(Term.Name(name), Lit.String(value))
         if isSecretName(name) && value.nonEmpty && !isPlaceholder(value) =>
-        report(findings, filePath, relPath, t.pos, lines, BugPattern.HardcodedSecret, context)
+        report(localFindings, filePath, relPath, t.pos, lines, BugPattern.HardcodedSecret, context)
       case Defn.Val(_, List(Pat.Var(Term.Name(name))), _, Lit.String(value))
         if isSecretName(name) && value.nonEmpty && !isPlaceholder(value) =>
-        report(findings, filePath, relPath, t.pos, lines, BugPattern.HardcodedSecret, context)
+        report(localFindings, filePath, relPath, t.pos, lines, BugPattern.HardcodedSecret, context)
 
       // ── Source.fromFile without Using ──
       case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Source"), Term.Name("fromFile")), _)
         if !context.contains("Using") && !context.contains("try") =>
-        report(findings, filePath, relPath, app.pos, lines, BugPattern.ResourceLeak, context)
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.ResourceLeak, context)
+
+      // ── Command injection: Runtime.exec / ProcessBuilder with non-literal ──
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("exec")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.CommandInjection, context)
+      case app @ Term.Apply.After_4_6_0(Term.Name("ProcessBuilder"), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.CommandInjection, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Process"), Term.Name("apply")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.CommandInjection, context)
+      // scala.sys.process: "cmd".! or "cmd".!! or Process("cmd")
+      case app @ Term.Select(qual, Term.Name(n)) if (n == "$bang" || n == "$bang$bang") && !isLiteralArg(qual) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.CommandInjection, context)
+
+      // ── Path traversal: new File / Paths.get with non-literal ──
+      case app @ Init.After_4_6_0(Type.Name("File"), _, argClauses)
+        if argClauses.flatMap(_.values).exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.PathTraversal, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Paths"), Term.Name("get")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.PathTraversal, context)
+
+      // ── XSS: Html() with non-literal ──
+      case app @ Term.Apply.After_4_6_0(Term.Name("Html"), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.XSS, context)
+
+      // ── Open redirect: Redirect() with non-literal URL ──
+      case app @ Term.Apply.After_4_6_0(Term.Name("Redirect"), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.OpenRedirect, context)
+
+      // ── SSRF: HTTP client with non-literal URL ──
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("singleRequest")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SSRF, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(_, Term.Name("url")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SSRF, context)
+      case app @ Term.Apply.After_4_6_0(Term.Select(Term.Name("Source"), Term.Name("fromURL")), argClause)
+        if argClause.values.exists(!isLiteralArg(_)) =>
+        report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SSRF, context)
 
       case _ => ()
 
@@ -212,9 +266,26 @@ private def scanFile(filePath: Path, relPath: String, findings: java.util.concur
       scan(child, newCtx)
     }
 
+  // First pass: pattern scan populates localFindings
   scan(tree, Nil)
 
+  // Second pass: taint analysis (if enabled) — filter constant-derived, enrich with flow
+  if enableTaint then
+    localFindings.asScala.foreach { finding =>
+      analyzeTaint(finding, tree, filePath, idx, Option(workspace)) match
+        case Some(enriched) => findings.add(enriched)
+        case None => () // suppressed by taint analysis (constant-derived)
+    }
+  else
+    localFindings.asScala.foreach(findings.add)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Check if a tree node is a literal value (string, int, etc.) — used for sink arg checks. */
+private def isLiteralArg(t: Tree): Boolean = t match
+  case _: Lit => true
+  case Term.Name("None") => true
+  case _ => false
 
 private def report(
   findings: java.util.concurrent.ConcurrentLinkedQueue[BugFinding],

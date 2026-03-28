@@ -159,6 +159,11 @@ enum BugPattern(val severity: BugSeverity, val category: BugCategory, val descri
   case JacksonDefaultTyping extends BugPattern(BugSeverity.Critical, BugCategory.Security,   "enableDefaultTyping — arbitrary class instantiation")
   case HardcodedSecret    extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "hardcoded password/secret/token in string literal")
   case ResourceLeak       extends BugPattern(BugSeverity.Medium,   BugCategory.Resource,     "Source.fromFile without Using/close — resource leak")
+  case CommandInjection   extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "Runtime.exec/ProcessBuilder with non-literal arg — command injection")
+  case PathTraversal      extends BugPattern(BugSeverity.High,     BugCategory.Security,     "new File/Paths.get with non-literal arg — path traversal")
+  case XSS               extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Html() with non-literal arg — cross-site scripting")
+  case OpenRedirect       extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Redirect with non-literal URL — open redirect")
+  case SSRF              extends BugPattern(BugSeverity.High,     BugCategory.Security,     "HTTP request with non-literal URL — server-side request forgery")
 
 case class BugFinding(
   file: Path,
@@ -166,8 +171,13 @@ case class BugFinding(
   pattern: BugPattern,
   contextLine: String,
   enclosingSymbol: String,
-  message: String
+  message: String,
+  taintFlow: Option[TaintFlow] = None
 )
+
+case class TaintSource(name: String, description: String, file: Path, line: Int)
+case class TaintStep(varName: String, file: Path, line: Int, operation: String)
+case class TaintFlow(source: TaintSource, steps: List[TaintStep], confidence: Double)
 
 case class HotspotInfo(
   file: String,
@@ -216,6 +226,7 @@ case class CommandContext(
   bugSeverity: Option[String] = None,
   bugCategory: Option[String] = None,
   hotspots: Boolean = false,
+  noTaint: Boolean = false,
 ):
   val fmt: (SymbolInfo, Path) => String = if verbose then formatSymbolVerbose else formatSymbol
   val jRef: Reference => String =

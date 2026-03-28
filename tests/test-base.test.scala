@@ -517,6 +517,27 @@ abstract class ScalexTestBase extends FunSuite:
         |}
         |""".stripMargin)
 
+    // Taint analysis test fixtures
+    writeFile("src/main/scala/com/bugs/TaintSafe.scala",
+      """package com.bugs
+        |
+        |object TaintSafe {
+        |  val table = "users"
+        |  def safe = Fragment.const(s"SELECT * FROM $table")
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/TaintDangerous.scala",
+      """package com.bugs
+        |
+        |object TaintDangerous {
+        |  def handler(request: Request) = {
+        |    val id = request.params("id")
+        |    Fragment.const(s"SELECT * FROM users WHERE id = $id")
+        |  }
+        |}
+        |""".stripMargin)
+
     // Initialize git repo
     run("git", "init")
     run("git", "add", ".")

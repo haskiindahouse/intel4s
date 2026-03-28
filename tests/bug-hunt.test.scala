@@ -254,6 +254,56 @@ class BugHuntSuite extends ScalexTestBase:
       case other => fail(s"Expected BugHuntReport, got: $other")
   }
 
+  // ── Taint analysis tests ───────────────────────────────────────────
+
+  test("bug-hunt taint: constant-derived Fragment.const is suppressed") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    // With taint (default): TaintSafe should be suppressed
+    val ctx = CommandContext(idx = idx, workspace = workspace, limit = 0,
+      pathFilter = Some("src/main/scala/com/bugs/TaintSafe.scala"))
+    val result = cmdBugHunt(Nil, ctx)
+    result match
+      case r: CmdResult.BugHuntReport =>
+        val fragmentFindings = r.findings.filter(_.pattern == BugPattern.FragmentConst)
+        assertEquals(fragmentFindings.size, 0,
+          s"TaintSafe Fragment.const should be suppressed (constant-derived): $fragmentFindings")
+      case other => fail(s"Expected BugHuntReport, got: $other")
+  }
+
+  test("bug-hunt taint: --no-taint keeps constant-derived findings") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    // Without taint: TaintSafe should NOT be suppressed
+    val ctx = CommandContext(idx = idx, workspace = workspace, limit = 0, noTaint = true,
+      pathFilter = Some("src/main/scala/com/bugs/TaintSafe.scala"))
+    val result = cmdBugHunt(Nil, ctx)
+    result match
+      case r: CmdResult.BugHuntReport =>
+        val fragmentFindings = r.findings.filter(_.pattern == BugPattern.FragmentConst)
+        assert(fragmentFindings.nonEmpty,
+          s"With --no-taint, TaintSafe Fragment.const should NOT be suppressed")
+      case other => fail(s"Expected BugHuntReport, got: $other")
+  }
+
+  test("bug-hunt taint: tainted input enriches finding with flow") {
+    val idx = WorkspaceIndex(workspace)
+    idx.index()
+    val ctx = CommandContext(idx = idx, workspace = workspace, limit = 0,
+      pathFilter = Some("src/main/scala/com/bugs/TaintDangerous.scala"))
+    val result = cmdBugHunt(Nil, ctx)
+    result match
+      case r: CmdResult.BugHuntReport =>
+        val fragmentFindings = r.findings.filter(_.pattern == BugPattern.FragmentConst)
+        assert(fragmentFindings.nonEmpty,
+          s"TaintDangerous Fragment.const should be reported")
+        // Should have taint flow info
+        val withTaint = fragmentFindings.filter(_.taintFlow.isDefined)
+        assert(withTaint.nonEmpty,
+          s"TaintDangerous should have taint flow info: ${fragmentFindings.map(f => (f.contextLine, f.taintFlow))}")
+      case other => fail(s"Expected BugHuntReport, got: $other")
+  }
+
   test("bug-hunt: hotspots sorted by risk descending") {
     val idx = WorkspaceIndex(workspace)
     idx.index()

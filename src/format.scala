@@ -1454,11 +1454,21 @@ private def renderScaffoldTest(r: CmdResult.ScaffoldTest, ctx: CommandContext): 
   }
 }
 
+private def confidenceLabel(score: Double): String =
+  if score >= 5.0 then "HIGH"
+  else if score >= 2.0 then "MEDIUM"
+  else "LOW"
+
 private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext): Unit = {
   if ctx.jsonOutput then {
     val findingsJson = r.findings.map { f =>
       val rel = jsonEscape(ctx.workspace.relativize(f.file).toString)
-      s"""{"file":"$rel","line":${f.line},"pattern":"${f.pattern.toString}","severity":"${f.pattern.severity.toString.toLowerCase}","category":"${f.pattern.category.toString.toLowerCase}","message":"${jsonEscape(f.message)}","contextLine":"${jsonEscape(f.contextLine)}","enclosingSymbol":"${jsonEscape(f.enclosingSymbol)}"}"""
+      val taintJson = f.taintFlow match
+        case Some(flow) =>
+          val stepsJson = flow.steps.map(s => s"""{"var":"${jsonEscape(s.varName)}","line":${s.line},"op":"${jsonEscape(s.operation)}"}""").mkString("[", ",", "]")
+          s""","taint":{"source":"${jsonEscape(flow.source.name)}","sourceType":"${jsonEscape(flow.source.description)}","sourceLine":${flow.source.line},"steps":$stepsJson,"confidence":${flow.confidence}}"""
+        case None => ""
+      s"""{"file":"$rel","line":${f.line},"pattern":"${f.pattern.toString}","severity":"${f.pattern.severity.toString.toLowerCase}","category":"${f.pattern.category.toString.toLowerCase}","message":"${jsonEscape(f.message)}","contextLine":"${jsonEscape(f.contextLine)}","enclosingSymbol":"${jsonEscape(f.enclosingSymbol)}"$taintJson}"""
     }.mkString("[", ",", "]")
     val hotspotsJson = r.hotspots.map { h =>
       s"""{"file":"${jsonEscape(h.file)}","findingCount":${h.findingCount},"churnScore":${h.churnScore},"complexityScore":${h.complexityScore},"riskScore":${h.riskScore}}"""
@@ -1474,9 +1484,14 @@ private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext)
       r.findings.foreach { f =>
         val rel = ctx.workspace.relativize(f.file)
         val sevTag = f.pattern.severity.toString.toUpperCase
-        println(s"  [$sevTag] $rel:${f.line} — ${f.pattern.category}")
+        val taintTag = f.taintFlow.map(t => s" (taint: ${confidenceLabel(t.confidence)})").getOrElse("")
+        println(s"  [$sevTag] $rel:${f.line} — ${f.pattern.category}$taintTag")
         println(s"    ${f.contextLine}")
         println(s"    ${f.message}")
+        f.taintFlow.foreach { flow =>
+          val chain = (flow.source.name :: flow.steps.map(s => s"${s.varName}")).mkString(" → ")
+          println(s"    Flow: $chain")
+        }
         println()
       }
     }
