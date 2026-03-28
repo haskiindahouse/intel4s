@@ -1,89 +1,54 @@
 <p align="center">
-  <img src="docs/vulture.png" alt="intel4s" width="256">
+  <img src="docs/vulture.png" alt="intel4s" width="200">
   <br>
-  <strong style="font-size: 2.5em;">intel4s</strong>
+  <strong>intel4s</strong>
   <br><br>
-  <em>Code intelligence for Scala. Works without a build. Gets smarter when you compile.</em>
+  <em>Scalameta-based code index for AI agents. Text-based by default, type-aware with SemanticDB.</em>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href="#commands"><img src="https://img.shields.io/badge/commands-37-brightgreen.svg" alt="37 Commands"></a>
-  <a href="#benchmarks"><img src="https://img.shields.io/badge/tests-528_passing-brightgreen.svg" alt="528 Tests"></a>
-  <a href="#semantic-mode"><img src="https://img.shields.io/badge/SemanticDB-hybrid-blueviolet.svg" alt="SemanticDB Hybrid"></a>
-</p>
-
-<p align="center">
-  <a href="#quick-start">Quick Start</a> &middot;
-  <a href="#semantic-mode">Semantic Mode</a> &middot;
-  <a href="#commands">Commands</a> &middot;
-  <a href="#benchmarks">Benchmarks</a>
 </p>
 
 ---
 
-Like [Metals](https://scalameta.org/metals/), but without the build server. Like `grep`, but it understands Scala. Like `ctags`, but built for AI agents.
+## What this is
 
-- **Hybrid intelligence.** Text-based by default — no build needed. Add `-Xsemanticdb` to your compiler and get type-aware refs, rename, and call-graph. Works in both modes, automatically.
-- **Semantic rename.** Two classes named `Config` in different packages? `rename --semantic` only renames the right one. grep can't. Even IntelliJ sometimes gets this wrong.
-- **37 commands, one tool call each.** `explain` returns definition + docs + members + implementations in one shot. Saves 4-5 round trips for AI agents.
-- **MCP native.** Works with Cursor, Windsurf, Cline, Claude Code out of the box. One config line.
-- **Dead code detection.** `unused` finds symbols with zero external references. Bloom filter pre-screen + text verification. No compiler needed.
-- **Call graph.** `call-graph` shows what a method calls and who calls it. Bidirectional, in one command.
-- **Scaffold.** Generate implementation stubs with type parameter substitution. `scaffold impl MyService` resolves `T` to `User` automatically.
+A CLI that parses Scala source files via [Scalameta](https://scalameta.org/), builds an in-memory symbol index, and answers structural queries. No build server, no compilation, no daemon. Designed for AI coding agents that need structured code navigation instead of grep.
 
----
+**What it does well** (without types):
+- Symbol search, definition lookup, hierarchy walking — from parsed ASTs
+- `refs` / `imports` — bloom filter pre-screening + word-boundary text matching. Not type-aware, but finds references that grep misses (wildcard imports, alias imports)
+- `unused` — if no file's bloom filter contains the symbol name, it has zero external references
+- `call-graph` — parses method body, finds method calls by identifier name in the AST. Can't resolve overloads or virtual dispatch
+- `bug-hunt` — AST pattern matching for 45 known-bad patterns (`.get` on Option, `null`, `asInstanceOf`, SQL injection patterns, weak crypto, etc)
 
-## Semantic Mode
+**What it does better** (with `-Xsemanticdb`):
+- `rename --semantic` reads `.semanticdb` files from the compiler. Two `Config` in different packages? Only renames the right one
+- `call-graph --semantic` uses compiler-produced occurrence data for precise callees
+- `refs --semantic` resolves same-named symbols by package
 
-The killer feature. Most Scala tools are either fast-but-dumb (grep) or smart-but-heavy (Metals LSP). intel4s is both.
-
-**Without compilation** (always works):
-```bash
-intel4s refs Config          # text-based, word-boundary matching
-intel4s rename Config Cfg    # renames ALL symbols named Config
-```
-
-**With compilation** (`-Xsemanticdb`):
-```bash
-intel4s refs Config --semantic       # type-aware, package-precise
-intel4s rename Config Cfg --semantic  # only renames app.Config, not db.Config
-```
-
-```
-$ intel4s rename Config ServerConfig --semantic
-
-2 symbols named 'Config' found. Renaming only:
-  app/Config#
-Untouched:
-  db/Config# (db)
-Using semantic rename (42 compiled files) — type-aware, precise
-
-Rename "Config" → "ServerConfig" — 4 edits in 2 files:
-
-  src/App.scala
-    L3 [definition]  case class Config(host: String, port: Int)
-       →  case class ServerConfig(host: String, port: Int)
-    L5 [usage]  class Server(config: Config) {
-       →  class Server(config: ServerConfig) {
-```
-
-`db.Config` is untouched. grep would have broken it.
-
-Enable SemanticDB in your build:
-```scala
-// Scala 3 (scalacOptions)
-"-Xsemanticdb"
-
-// sbt
-semanticdbEnabled := true
-
-// Metals: automatic — already enabled
-```
+**What it can't do:**
+- Resolve implicits, type aliases, or macro-generated code
+- Infer types (we parse source, we don't compile it)
+- Distinguish overloaded methods without SemanticDB
+- Full data flow analysis in the compiler sense — our taint tracking is heuristic-based (variable name patterns + backward tracing through assignments)
 
 ---
 
 ## Quick Start
+
+### Claude Code
+
+```bash
+claude plugins install intel4s
+```
+
+Then in your project:
+```
+/intel4s:setup
+```
 
 ### MCP Server (Cursor, Windsurf, Cline)
 
@@ -99,54 +64,15 @@ semanticdbEnabled := true
 }
 ```
 
-Index stays in memory between tool calls. Every command becomes an MCP tool.
-
-### Claude Code (recommended)
-
-```bash
-/plugin marketplace add haskiindahouse/intel4s
-/plugin install intel4s@intel4s-marketplace
-```
-
-Then ask:
-
-> *"use intel4s to explore how authentication works in this codebase"*
-
-The plugin installs skills, an agent, and a bootstrap script that auto-downloads the native binary on first run.
-
-Then set up your project:
-
-> */intel4s:setup*
-
-This detects your build tool, analyzes the codebase, and writes a Scala Code Intelligence section to your `CLAUDE.md` so the agent knows when and how to use intel4s.
-
 ### CLI
 
 ```bash
-# Build from source (scala-cli + GraalVM)
 git clone https://github.com/haskiindahouse/intel4s.git
 cd intel4s && ./build-native.sh
 
-# Or run directly without building
+# Or run without building
 scala-cli run src/ -- search /path/to/project MyClass
 ```
-
----
-
-## Plugin Skills
-
-After installing in Claude Code, run `/intel4s:setup` to configure your project. The plugin provides:
-
-| Skill | Purpose |
-|---|---|
-| `/intel4s:setup` | One-time project onboarding — writes CLAUDE.md section |
-| `/intel4s:semanticdb` | Enable SemanticDB for type-aware rename and call-graph |
-| `/intel4s:upgrade` | Upgrade scalex binary to latest release |
-| `/intel4s:doctor` | Diagnostic check — binary, SemanticDB, CLAUDE.md |
-
-The plugin also includes a **scala-expert** agent that Claude invokes automatically for complex multi-step tasks (refactoring, impact analysis, codebase exploration). It chains 3+ scalex commands together following built-in workflow recipes.
-
-For full command documentation, see [SKILL.md](plugins/scalex/skills/scalex/SKILL.md).
 
 ---
 
@@ -156,99 +82,129 @@ For full command documentation, see [SKILL.md](plugins/scalex/skills/scalex/SKIL
 
 ```bash
 intel4s search Service --kind trait         # fuzzy camelCase search
-intel4s def UserService --verbose           # find definition
-intel4s explain UserService --related       # one-shot: def + doc + members + impls
-intel4s hierarchy Compiler --depth 3        # full inheritance tree
-intel4s members Signal --inherited          # API surface including parents
+intel4s def UserService --verbose           # find definition with signature
+intel4s explain UserService --related       # definition + doc + members + impls in one call
+intel4s hierarchy Compiler --depth 3        # inheritance tree from parsed extends clauses
+intel4s members Signal --inherited          # members including parents
 ```
 
 ### Refactor
 
 ```bash
-intel4s rename OldName NewName              # text-based rename (fast)
-intel4s rename OldName NewName --semantic   # type-aware rename (precise)
-intel4s scaffold impl MyServiceLive         # generate stubs with type param substitution
+intel4s rename OldName NewName              # text-based, word-boundary safe
+intel4s rename OldName NewName --semantic   # type-aware via SemanticDB (requires compilation)
+intel4s scaffold impl MyServiceLive         # generate override stubs with type param substitution
 intel4s scaffold test MyService             # test skeleton (munit/scalatest/zio-test)
 ```
 
 ### Analyze
 
 ```bash
-intel4s refs UserService --count            # impact: "12 importers, 4 extensions"
-intel4s refs UserService --semantic         # type-aware references
-intel4s call-graph processPayment --in Svc  # what it calls + who calls it
-intel4s call-graph processPayment --semantic --in Svc  # compiler-precise callees
-intel4s unused com.legacy                   # dead code detection
-intel4s bug-hunt --hotspots                 # scan for bugs & vulnerabilities
-intel4s bug-hunt --severity critical        # security-only (SQL injection, deserialization)
-intel4s coverage UserService                # is this tested?
-intel4s deps Phase --depth 2                # transitive dependencies
+intel4s refs UserService --count            # how many files reference this symbol
+intel4s call-graph processPayment --in Svc  # what it calls + who calls it (by name matching)
+intel4s unused com.legacy                   # symbols with zero external refs (bloom pre-screen + text verify)
+intel4s bug-hunt --hotspots                 # 45 AST patterns + taint heuristics + git churn ranking
+intel4s bug-hunt --severity critical        # only critical patterns (SQL injection, deserialization)
+intel4s coverage UserService                # references in test files only
+intel4s deps Phase --depth 2               # what this symbol depends on (imports + body refs)
 ```
 
 ### Explore
 
 ```bash
-intel4s overview --concise                  # ~60-line codebase summary
-intel4s api com.example --used-by com.web   # coupling analysis
-intel4s diff HEAD~5                         # symbol-level diff vs git ref
-intel4s ast-pattern --extends Phase --has-method run  # structural search
-intel4s grep "pattern" --in ClassName --each-method   # scoped grep
-```
-
-### Generate
-
-```bash
-intel4s scaffold impl UserServiceLive       # override stubs with T → User
-intel4s scaffold test UserService --framework zio-test
-intel4s graph --render "A->B, B->C"         # ASCII graph art
+intel4s overview --concise                  # project summary: packages, key types, stats
+intel4s api com.example --used-by com.web   # which symbols are imported by another package
+intel4s diff HEAD~5                         # which symbols changed vs a git ref
+intel4s ast-pattern --extends Phase --has-method run  # structural search by shape
+intel4s grep "pattern" --in ClassName --each-method   # regex scoped to a type's methods
 ```
 
 <details>
 <summary><strong>All 37 commands</strong></summary>
 
 ```
-search          Search symbols by name (fuzzy camelCase)
-def             Find definition
-impl            Find implementations
-refs            Find references (text or semantic)
-imports         Import graph (wildcard-aware)
-members         List members (with --inherited)
-doc             Show scaladoc
-explain         One-shot composite summary
-body            Extract source body
-hierarchy       Full inheritance tree
-overrides       Find override implementations
-deps            Symbol dependencies
-context         Enclosing scopes at a line
-diff            Symbol-level diff vs git ref
-coverage        Is this symbol tested?
+search          Fuzzy camelCase symbol search
+def             Find where a symbol is defined
+impl            Find classes/objects extending a trait
+refs            Find references (text matching + bloom filters)
+imports         Find import statements for a symbol
+members         List members of a class/trait/object
+doc             Extract scaladoc comment
+explain         Definition + doc + members + impls in one call
+body            Extract method/class source text
+hierarchy       Inheritance tree from extends clauses
+overrides       Find override implementations across types
+deps            Import + body dependencies of a symbol
+context         Enclosing scopes at a file:line
+diff            Symbol-level diff vs a git ref
+coverage        References in test files only
 tests           List test cases structurally
-ast-pattern     Structural AST search
-overview        Codebase summary
-api             Public API surface
-summary         Package breakdown
+ast-pattern     Search by structural shape (extends + has-method + body-contains)
+overview        Project summary (symbols by kind, top packages)
+api             Externally-imported symbols of a package
+summary         Sub-packages with symbol counts
 packages        List all packages
-package         Explore a package
-file            Find files by name
-symbols         Symbols in a file
-annotated       Find annotated symbols
-entrypoints     Find @main, def main, extends App
-grep            Regex content search
-index           Rebuild the index
-batch           Multiple queries, one index load
-rename          Safe rename across codebase
-unused          Dead code detection
-call-graph      Bidirectional method call graph
-bug-hunt        Scan for bug patterns & vulnerabilities
-scaffold impl   Generate implementation stubs
-scaffold test   Generate test skeleton
-graph           ASCII/Unicode graph rendering
-mcp             Start MCP server
+package         All symbols in a package
+file            Find files by name (fuzzy)
+symbols         What's defined in a file
+annotated       Find symbols with a specific annotation
+entrypoints     Find @main, def main, extends App, test suites
+grep            Regex search scoped to Scala/Java files
+index           Force reindex
+batch           Multiple queries, one index load (stdin)
+rename          Word-boundary rename (text or semantic)
+unused          Symbols with zero external references
+call-graph      Callees (from body) + callers (from refs) of a method
+bug-hunt        45 AST patterns + taint analysis + hotspot ranking
+scaffold impl   Generate override stubs for unimplemented members
+scaffold test   Generate test suite skeleton
+graph           ASCII/Unicode directed graph rendering
+mcp             Start MCP server (JSON-RPC over stdio)
 ```
 
 </details>
 
-All commands support `--json`, `--path`, `--no-tests`, `--in-package`, `--max-output`, `--limit`.
+All commands support `--json`, `--path`, `--no-tests`, `--in-package`, `--limit`.
+
+---
+
+## bug-hunt
+
+AST pattern scanner with heuristic taint analysis. Finds common bug patterns without compilation.
+
+**45 patterns** across 7 categories: security (SQL injection, XSS, SSRF, XXE, command injection, path traversal, weak crypto, hardcoded secrets), type safety (.get, .head, asInstanceOf, null, return in lambda), concurrency (Await.result with Duration.Inf, Thread.sleep, nested synchronized, sender() in Future), effects (throw in ZIO.succeed, ZIO.die, unsafeRun), resources (unclosed streams/connections).
+
+**Taint analysis** (on by default): traces variable assignments backward from sinks to sources within a single method body. If all sink arguments are derived from literals → suppressed. If an argument traces back to an HTTP parameter → enriched with flow chain. Cross-file tracing is limited (checks if callee body directly contains a source, max 3 hops). Not compiler-grade data flow — it's variable name heuristics + AST backward tracing, not type-based.
+
+```bash
+intel4s bug-hunt -w /path/to/project              # all patterns, taint on
+intel4s bug-hunt --severity critical --no-tests    # critical only, production code
+intel4s bug-hunt --hotspots                        # rank files by findings × git churn
+intel4s bug-hunt --no-taint                        # pattern-only mode (faster)
+intel4s bug-hunt --json                            # structured output for tooling
+```
+
+---
+
+## Plugin Skills (Claude Code)
+
+13 skills + 1 agent for automated workflows:
+
+| Skill | What it does |
+|---|---|
+| `/intel4s:setup` | Detect build tool, run overview, write CLAUDE.md section |
+| `/intel4s:semanticdb` | Add `-Xsemanticdb` to build config, compile, verify |
+| `/intel4s:doctor` | Check binary, index, SemanticDB, CLAUDE.md status |
+| `/intel4s:upgrade` | Upgrade binary to latest release |
+| `/intel4s:bug-hunt` | Scan → LLM triage → GitHub issues cross-ref → reproduction |
+| `/intel4s:audit` | Full codebase audit across 8 dimensions |
+| `/intel4s:critique` | Architecture evaluation (coupling, cohesion, hierarchy) |
+| `/intel4s:harden` | Add validation, timeouts, retries, error handling |
+| `/intel4s:simplify` | Remove dead code, flatten complexity, inline indirection |
+| `/intel4s:normalize` | Discover project conventions, align deviating code |
+| `/intel4s:extract` | Find duplication, extract reusable traits/utilities |
+| `/intel4s:polish` | Final pass: naming, imports, docs, consistency |
+| `scala-expert` | Agent auto-invoked for multi-step tasks (3+ commands) |
 
 ---
 
@@ -259,81 +215,52 @@ All commands support `--json`, `--path`, `--no-tests`, `--in-package`, `--max-ou
 | Production monorepo | 14,219 | 170,094 | 5.3s | 445ms |
 | Scala 3 compiler | 18,485 | 144,211 | 2.7s | 349ms |
 
-### intel4s vs grep
+### vs grep
 
 | Task | intel4s | grep |
 |---|---|---|
-| Who imports Compiler? | **1,206 files** (wildcard-aware) | 17 files (misses 98.6%) |
-| Full inheritance tree | Complete transitive tree | Impossible |
-| Impact of changing X? | 283 refs, categorized + ranked | 1,135 lines, flat |
-| Rename Config (2 packages) | `--semantic`: only the right one | Breaks both |
+| Who imports Compiler? | 1,206 files (resolves wildcard imports) | 17 files (literal match only) |
+| Inheritance tree | Complete from parsed extends clauses | Not possible |
+| Rename Config (2 packages) | `--semantic` renames only the right one | Renames both (no disambiguation) |
 
-### When to use grep instead
-
-| Task | Tool |
-|---|---|
-| String literals, error messages | grep |
-| Config values, flag names | grep |
-| Non-Scala files | grep |
-| Everything else | **intel4s** |
+Use grep for: string literals, config values, non-Scala files.
 
 ---
 
 ## How It Works
 
 ```
-  1. git ls-files --stage       — every tracked .scala/.java file + content hash
-     │                            ~40ms for 18k files
-     v
-  2. Compare OIDs vs cache      — unchanged files skipped (0 changes = 0 parses)
-     │
-     v
-  3. Scalameta parse (parallel) — source → AST → symbols, bloom filters, imports
-     │
-     v
-  4. .intel4s/index.bin         — binary cache with string interning
-     │                            loads in ~225ms for 144k+ symbols
-     v
-  5. Answer the query           — lazy indexes, pay only for what you need
-     │
-     v
-  6. [Optional] SemanticDB      — if .semanticdb files exist, enhance with
-                                  type-aware refs, rename, call-graph
+1. git ls-files --stage       → tracked .scala/.java files + content hashes
+2. Compare OIDs vs cache      → skip unchanged files
+3. Scalameta parse (parallel) → AST → symbols, bloom filters, imports
+4. .intel4s/index.bin          → binary cache with string interning
+5. Answer the query            → lazy indexes
+6. [Optional] SemanticDB       → .semanticdb files from compiler for type-aware mode
 ```
 
-No build server. No daemon. No background process. Run, answer, exit.
+No build server. No daemon. Run, answer, exit.
 
 ---
 
-## Agent Workflows
+## Limitations
 
-intel4s includes a Claude Code plugin with autonomous multi-step workflows. The agent orchestrates commands without asking at each step.
+- **No type inference.** We parse source text into ASTs. We don't know what type `x` has unless it's annotated.
+- **No implicit resolution.** Can't find given instances that the compiler would select.
+- **No macro expansion.** Macro-generated code is invisible.
+- **refs is text-based.** `refs Config` finds all things named Config across all packages. Use `--semantic` for type-aware disambiguation.
+- **Taint analysis is heuristic.** We trace variable names, not types. False positives exist. The LLM triage step in `/intel4s:bug-hunt` skill helps filter them.
+- **call-graph without --semantic** matches method names, not resolved dispatch targets.
 
-**Explore unfamiliar codebase:**
-`overview --concise` → `entrypoints` → `summary <pkg>` → `explain <Type> --related`
-
-**Safe rename:**
-`rename Old New --semantic` → review edits → apply → `refs Old --count` (verify: 0)
-
-**Impact analysis:**
-`refs X --count` → `call-graph method --semantic` → `hierarchy X` → `imports X`
-
-**Implement a trait:**
-`scaffold impl MyClass` → `explain ParentTrait` → `overrides method --body` → write code → `scaffold test`
-
-**Find dead code:**
-`unused com.legacy` → `refs Candidate --count` → `coverage Candidate` → remove
+For full semantic precision, compile with `-Xsemanticdb` and use `--semantic` flag.
 
 ---
 
 ## Credits
 
-Built on the [scalex](https://github.com/nguyenyou/scalex) codebase by Tu Nguyen. Licensed under MIT.
+Built on [scalex](https://github.com/nguyenyou/scalex) by Tu Nguyen. MIT licensed.
 
-intel4s extends scalex with semantic rename, SemanticDB integration, call-graph analysis, dead code detection, and code scaffolding.
-
-- [Metals](https://scalameta.org/metals/) — ideas: git OID caching, bloom filter search, parallel indexing
 - [Scalameta](https://scalameta.org/) — AST parsing and SemanticDB format
+- [Metals](https://scalameta.org/metals/) — inspiration for git OID caching, bloom filter search
 - [ascii-graphs](https://github.com/scalameta/ascii-graphs) — Sugiyama-style graph layout (ported to Scala 3.8)
 
 ---

@@ -16,7 +16,7 @@
       "author": {
         "name": "haskiindahouse"
       },
-      "homepage": "https://haskiindahouse.github.io/intel4s/",
+      "homepage": "https://github.com/haskiindahouse/intel4s",
       "repository": "https://github.com/haskiindahouse/intel4s",
       "license": "MIT",
       "keywords": ["scala", "code-intelligence", "ai-agent", "semantic-rename", "call-graph", "mcp"],
