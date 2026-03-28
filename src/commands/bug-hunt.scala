@@ -101,19 +101,21 @@ private def scanFile(
   enableTaint: Boolean = false, idx: Option[WorkspaceIndex] = None, workspace: Path = null
 ): Unit =
   val source = try Files.readString(filePath) catch
-    case _: java.io.IOException => return
+    case _: java.io.IOException => ""
+  if source.isEmpty then {/* empty */} else {
   val lines = source.split('\n')
   val input = Input.VirtualFile(filePath.toString, source)
-  val tree = try
+  val treeParsed = try
     given scala.meta.Dialect = scala.meta.dialects.Scala3
-    input.parse[Source].get
+    Some(input.parse[Source].get)
   catch
     case _: Exception =>
       try
         given scala.meta.Dialect = scala.meta.dialects.Scala213
-        input.parse[Source].get
+        Some(input.parse[Source].get)
       catch
-        case _: Exception => return
+        case _: Exception => None
+  treeParsed.foreach { tree =>
 
   // Local buffer for this file's findings (taint post-processes before adding to main queue)
   val localFindings = java.util.concurrent.ConcurrentLinkedQueue[BugFinding]()
@@ -278,6 +280,8 @@ private def scanFile(
     }
   else
     localFindings.asScala.foreach(findings.add)
+  } // end treeParsed.foreach
+  } // end if source.nonEmpty
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -309,13 +313,11 @@ private def isSafeGet(sel: Term.Select, qual: Term, context: List[String]): Bool
   val hasArg = sel.parent match
     case Some(Term.Apply.After_4_6_0(_, argClause)) => argClause.values.nonEmpty
     case _ => false
-  if hasArg then return true
 
   // 2. Inside for-comprehension with <- (Enumerator.Generator) — likely ZIO Ref.get / IO
   val inForGenerator = sel.parent match
     case Some(_: Enumerator.Generator) => true
     case _ => false
-  if inForGenerator then return true
 
   // 3. Qualifier is a known safe name pattern (ref, state, counter, queue, hub, promise, semaphore)
   val qualName = qual match
@@ -324,22 +326,21 @@ private def isSafeGet(sel: Term.Select, qual: Term, context: List[String]): Bool
     case _ => ""
   val safeRefNames = Set("ref", "state", "counter", "store", "cache", "queue", "hub",
     "promise", "semaphore", "stateref", "mapref", "fiberref")
-  if safeRefNames.exists(qualName.contains) then return true
+  val isRefName = safeRefNames.exists(qualName.contains)
 
   // 4. Qualifier is a known endpoint builder pattern (base, endpoint)
   val endpointNames = Set("base", "endpoint", "secureendpoint", "publicendpoint")
-  if endpointNames.contains(qualName) || qualName.endsWith("base") || qualName.endsWith("endpoint") then return true
+  val isEndpoint = endpointNames.contains(qualName) || qualName.endsWith("base") || qualName.endsWith("endpoint")
 
   // 5. In ZIO context (for-comprehension body) — .get is likely Ref.get
-  if context.contains("for-body") then return true
+  val inForBody = context.contains("for-body")
 
   // 6. .get followed by .map/.flatMap/.foreach — likely Ref.get or IO, not Option.get
   val chainedWithEffect = sel.parent match
     case Some(Term.Select(_, Term.Name(n))) if Set("map", "flatMap", "foreach", "tap", "mapError").contains(n) => true
     case _ => false
-  if chainedWithEffect then return true
 
-  false
+  hasArg || inForGenerator || isRefName || isEndpoint || inForBody || chainedWithEffect
 
 private def isStringInterpolation(t: Tree): Boolean = t match
   case Term.Interpolate(_, _, _) => true
