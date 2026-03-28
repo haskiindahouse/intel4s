@@ -1,6 +1,6 @@
 {
   "name": "intel4s",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Code intelligence for Scala — semantic rename, call-graph, dead code detection, scaffolding. Works without a build, type-aware when compiled.",
   "author": {
     "name": "haskiindahouse"
