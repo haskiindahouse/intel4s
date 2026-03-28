@@ -2,6 +2,21 @@
 
 All notable changes to intel4s are documented here.
 
+## [0.4.0] — 2026-03-28
+
+### Added
+
+- **7 refactoring skills** inspired by the impeccable plugin's dimensional approach:
+  - `/intel4s:audit` — full codebase audit across 8 dimensions (security, dead code, complexity, test coverage, architecture, style, error handling, dependencies)
+  - `/intel4s:critique` — architecture evaluation (type hierarchy, coupling, cohesion, effect system, API surface, pattern consistency, testability)
+  - `/intel4s:polish` — final quality pass (naming, imports, docs, method signatures, redundancy, type safety, consistency)
+  - `/intel4s:normalize` — discover project conventions, find deviations, align code to majority patterns
+  - `/intel4s:harden` — production hardening (input validation, timeouts, retries, resource safety, null safety, concurrency, graceful degradation)
+  - `/intel4s:simplify` — reduce complexity (dead code removal, flatten inheritance, extract methods, remove abstractions, inline delegation)
+  - `/intel4s:extract` — identify duplication, extract reusable components (traits, type classes, utilities, modules). Rule of three enforced
+- **End-to-end pipeline**: setup → explore → audit → bug-hunt → critique → harden → simplify → normalize → extract → polish → verify
+- Total plugin skills: 13. Total with agent: 14 components
+
 ## [0.3.0] — 2026-03-28
 
 ### Added
