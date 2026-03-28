@@ -135,6 +135,48 @@ case class EntrypointInfo(sym: SymbolInfo, category: EntrypointCategory, memberL
 enum EntrypointCategory:
   case MainAnnotation, MainMethod, ExtendsApp, TestSuite
 
+// ── Bug hunt types ─────────────────────────────────────────────────────────
+
+enum BugSeverity:
+  case Critical, High, Medium
+
+enum BugCategory:
+  case Security, TypeSafety, Concurrency, Resource, Effect
+
+enum BugPattern(val severity: BugSeverity, val category: BugCategory, val description: String):
+  case OptionGet          extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   ".get on Option — throws NoSuchElementException if empty")
+  case CollectionHead     extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   ".head on collection — throws on empty collection")
+  case AsInstanceOf       extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   "asInstanceOf — ClassCastException at runtime")
+  case NullLiteral        extends BugPattern(BugSeverity.Medium,   BugCategory.TypeSafety,   "null literal — NullPointerException risk")
+  case ReturnInLambda     extends BugPattern(BugSeverity.High,     BugCategory.TypeSafety,   "return in lambda — non-local return, deprecated in Scala 3")
+  case ThrowInZioSucceed  extends BugPattern(BugSeverity.High,     BugCategory.Effect,       "throw inside ZIO.succeed/UIO — unhandled defect")
+  case AwaitInfinite      extends BugPattern(BugSeverity.High,     BugCategory.Concurrency,  "Await.result with Duration.Inf — blocks forever")
+  case ThreadSleepAsync   extends BugPattern(BugSeverity.Medium,   BugCategory.Concurrency,  "Thread.sleep in async context — blocks fiber scheduler")
+  case SenderInFuture     extends BugPattern(BugSeverity.High,     BugCategory.Concurrency,  "sender() inside Future — captures stale ActorRef")
+  case FragmentConst      extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "Fragment.const with interpolation — SQL injection")
+  case SpliceInterpolation extends BugPattern(BugSeverity.Critical, BugCategory.Security,    "sql\"...#$...\" — unparameterized SQL splice")
+  case ObjectInputStream  extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "ObjectInputStream.readObject — insecure deserialization")
+  case JacksonDefaultTyping extends BugPattern(BugSeverity.Critical, BugCategory.Security,   "enableDefaultTyping — arbitrary class instantiation")
+  case HardcodedSecret    extends BugPattern(BugSeverity.Critical, BugCategory.Security,     "hardcoded password/secret/token in string literal")
+  case ResourceLeak       extends BugPattern(BugSeverity.Medium,   BugCategory.Resource,     "Source.fromFile without Using/close — resource leak")
+
+case class BugFinding(
+  file: Path,
+  line: Int,
+  pattern: BugPattern,
+  contextLine: String,
+  enclosingSymbol: String,
+  message: String
+)
+
+case class HotspotInfo(
+  file: String,
+  findingCount: Int,
+  churnScore: Int,
+  complexityScore: Int,
+  riskScore: Double
+)
+
 // ── Command context ────────────────────────────────────────────────────────
 
 case class CommandContext(
@@ -171,6 +213,9 @@ case class CommandContext(
   eachMethod: Boolean = false,
   semantic: Boolean = false,
   framework: String = "munit",
+  bugSeverity: Option[String] = None,
+  bugCategory: Option[String] = None,
+  hotspots: Boolean = false,
 ):
   val fmt: (SymbolInfo, Path) => String = if verbose then formatSymbolVerbose else formatSymbol
   val jRef: Reference => String =
@@ -248,5 +293,6 @@ enum CmdResult:
   case CallGraph(method: String, file: Path, line: Int, owner: String, callees: List[CalleeInfo], callers: List[Reference])
   case ScaffoldImpl(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, unimplemented: List[(parentName: String, parentFile: Path, parentLine: Int, members: List[MemberInfo])])
   case ScaffoldTest(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, publicMembers: List[MemberInfo], framework: String)
+  case BugHuntReport(findings: List[BugFinding], hotspots: List[HotspotInfo], filesScanned: Int, timedOut: Boolean)
   case NotFound(message: String, hint: NotFoundHint)
   case UsageError(message: String)

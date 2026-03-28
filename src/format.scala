@@ -118,6 +118,7 @@ def render(result: CmdResult, ctx: CommandContext): Unit = {
     case r: CallGraph        => renderCallGraph(r, ctx)
     case r: ScaffoldImpl     => renderScaffoldImpl(r, ctx)
     case r: ScaffoldTest     => renderScaffoldTest(r, ctx)
+    case r: BugHuntReport    => renderBugHuntReport(r, ctx)
     case r: NotFound         => renderNotFound(r, ctx)
     case r: UsageError       => println(r.message)
   }
@@ -1450,6 +1451,42 @@ private def renderScaffoldTest(r: CmdResult.ScaffoldTest, ctx: CommandContext): 
             println(s"""  test("${m.name} should ..."):""")
             println("    ???")
           }
+  }
+}
+
+private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then {
+    val findingsJson = r.findings.map { f =>
+      val rel = jsonEscape(ctx.workspace.relativize(f.file).toString)
+      s"""{"file":"$rel","line":${f.line},"pattern":"${f.pattern.toString}","severity":"${f.pattern.severity.toString.toLowerCase}","category":"${f.pattern.category.toString.toLowerCase}","message":"${jsonEscape(f.message)}","contextLine":"${jsonEscape(f.contextLine)}","enclosingSymbol":"${jsonEscape(f.enclosingSymbol)}"}"""
+    }.mkString("[", ",", "]")
+    val hotspotsJson = r.hotspots.map { h =>
+      s"""{"file":"${jsonEscape(h.file)}","findingCount":${h.findingCount},"churnScore":${h.churnScore},"complexityScore":${h.complexityScore},"riskScore":${h.riskScore}}"""
+    }.mkString("[", ",", "]")
+    println(s"""{"findings":$findingsJson,"hotspots":$hotspotsJson,"filesScanned":${r.filesScanned},"timedOut":${r.timedOut}}""")
+  } else {
+    val fileCount = r.findings.map(_.file).distinct.size
+    println(s"Bug hunt: ${r.findings.size} finding${if r.findings.size != 1 then "s" else ""} in $fileCount file${if fileCount != 1 then "s" else ""} (scanned ${r.filesScanned} files)")
+    if r.timedOut then println("  (timed out — partial results)")
+    if r.findings.isEmpty then println("  No issues found.")
+    else {
+      println()
+      r.findings.foreach { f =>
+        val rel = ctx.workspace.relativize(f.file)
+        val sevTag = f.pattern.severity.toString.toUpperCase
+        println(s"  [$sevTag] $rel:${f.line} — ${f.pattern.category}")
+        println(s"    ${f.contextLine}")
+        println(s"    ${f.message}")
+        println()
+      }
+    }
+    if r.hotspots.nonEmpty then {
+      println("Hotspots (risk = findings x churn):")
+      r.hotspots.take(10).foreach { h =>
+        println(s"  ${h.file} — ${h.findingCount} findings, ${h.churnScore} commits (risk: ${f"${h.riskScore}%.0f"})")
+      }
+      println()
+    }
   }
 }
 

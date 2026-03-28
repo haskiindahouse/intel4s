@@ -2,6 +2,13 @@
 
 All notable changes to intel4s are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`bug-hunt` command** — deterministic AST-based scanner for 15 common bug patterns (SQL injection, insecure deserialization, hardcoded secrets, unsafe casts, null usage, resource leaks, ZIO/Akka concurrency issues). Bloom filter pre-screening, parallel scan, hotspot ranking (complexity × git churn). Supports `--severity`, `--bug-category`, `--hotspots`, `--json`
+- **`/intel4s:bug-hunt` skill** — orchestrates full pipeline: scan → LLM triage → GitHub issues cross-reference (optional) → reproduction generation → structured report
+
 ## [0.2.0] — 2026-03-27
 
 ### Added

@@ -453,6 +453,70 @@ abstract class ScalexTestBase extends FunSuite:
         |}
         |""".stripMargin)
 
+    // Bug hunt test fixtures
+    writeFile("src/main/scala/com/bugs/OptionGetBug.scala",
+      """package com.bugs
+        |
+        |object OptionGetBug {
+        |  def bad: String = Option.empty[String].get
+        |  def ok: String = Option.empty[String].getOrElse("default")
+        |  def mapGet: Option[String] = Map("a" -> "b").get("a")
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/CollectionBug.scala",
+      """package com.bugs
+        |
+        |object CollectionBug {
+        |  def badHead: Int = List.empty[Int].head
+        |  def badLast: Int = List(1, 2).last
+        |  def ok: Int = List(1, 2).headOption.getOrElse(0)
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/NullBug.scala",
+      """package com.bugs
+        |
+        |object NullBug {
+        |  val bad: String = null
+        |  val ok: String = ""
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/CastBug.scala",
+      """package com.bugs
+        |
+        |object CastBug {
+        |  def bad(x: Any): String = x.asInstanceOf[String]
+        |  def ok(x: Any): Boolean = x.isInstanceOf[String]
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/ResourceBug.scala",
+      """package com.bugs
+        |
+        |import scala.io.Source
+        |
+        |object ResourceBug {
+        |  def bad: String = Source.fromFile("test.txt").mkString
+        |  def ok: String = {
+        |    val src = Source.fromFile("test.txt")
+        |    try src.mkString finally src.close()
+        |  }
+        |}
+        |""".stripMargin)
+
+    writeFile("src/main/scala/com/bugs/SecretBug.scala",
+      """package com.bugs
+        |
+        |object SecretBug {
+        |  val password = "hunter2"
+        |  val apiKey = "sk-1234567890"
+        |  val safeName = "not-a-secret"
+        |  val placeholder = "changeme"
+        |}
+        |""".stripMargin)
+
     // Initialize git repo
     run("git", "init")
     run("git", "add", ".")

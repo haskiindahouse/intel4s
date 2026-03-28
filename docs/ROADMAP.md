@@ -4,6 +4,19 @@
 
 - [ ] Publish plugin to Claude Code marketplace
 
+### Bug hunt — automated vulnerability and bug pattern detection
+
+- [x] `bug-hunt` command — AST-based scanner for 15 Tier 1 patterns (SQL injection, insecure deserialization, hardcoded secrets, unsafe casts, null, .get/.head, return in lambda, throw in ZIO.succeed, Await.result(Duration.Inf), Thread.sleep, sender() in Future, resource leaks)
+- [x] Bloom filter pre-screening — skip files that don't contain target identifiers
+- [x] Parallel scan with 20-second timeout
+- [x] `--severity` and `--bug-category` filters
+- [x] `--hotspots` — complexity × git churn ranking (single git call for all files)
+- [x] JSON output for skill consumption
+- [x] `/intel4s:bug-hunt` skill — LLM triage, GitHub issues cross-reference, reproduction generation
+- [ ] Reduce false positives: ZIO `Ref.get` vs `Option.get`, tapir endpoint builder `.get`
+- [ ] Tier 2 patterns: unhandled Future failures, non-exhaustive match, fiber leaks
+- [ ] Dependency vulnerability scanning (parse build files, compare CVE database)
+
 ### MCP server — use scalex from Cursor, Windsurf, Cline, and any MCP-compatible tool
 
 - [x] `scalex mcp` subcommand — starts a persistent MCP server over STDIO (JSON-RPC 2.0)
