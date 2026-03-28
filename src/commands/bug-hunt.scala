@@ -128,9 +128,9 @@ private def scanFile(
         report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.OptionGet, context)
 
       // ── .head / .last on collection ──
-      case sel @ Term.Select(_, Term.Name("head")) =>
+      case sel @ Term.Select(_, Term.Name("head")) if !context.contains("assertion") =>
         report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
-      case sel @ Term.Select(_, Term.Name("last")) =>
+      case sel @ Term.Select(_, Term.Name("last")) if !context.contains("assertion") =>
         report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionHead, context)
 
       // ── asInstanceOf ──
@@ -264,6 +264,9 @@ private def scanFile(
         // Track for-comprehension body for ZIO Ref.get detection
         case Term.ForYield.After_4_9_9(_, _) => "for-body" :: context
         case Term.For.After_4_9_9(_, _) => "for-body" :: context
+        // Track assertion context — .head/.last inside assertions are test patterns, not bugs
+        case Term.Apply.After_4_6_0(Term.Name(n), _) if assertionNames.contains(n) => "assertion" :: context
+        case Term.Apply.After_4_6_0(Term.Select(_, Term.Name(n)), _) if assertionNames.contains(n) => "assertion" :: context
         case _ => context
       scan(child, newCtx)
     }
@@ -341,6 +344,14 @@ private def isSafeGet(sel: Term.Select, qual: Term, context: List[String]): Bool
     case _ => false
 
   hasArg || inForGenerator || isRefName || isEndpoint || inForBody || chainedWithEffect
+
+private val assertionNames = Set(
+  "assert", "assertTrue", "assertEquals", "assertNotEquals",
+  "assertResult", "assertThrows", "intercept",
+  "shouldBe", "shouldEqual", "mustBe", "mustEqual",
+  "expect", "check", "verify",
+  "yield" // for-yield with assertTrue in ZIO test
+)
 
 private def isStringInterpolation(t: Tree): Boolean = t match
   case Term.Interpolate(_, _, _) => true
