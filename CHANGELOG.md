@@ -2,12 +2,15 @@
 
 All notable changes to intel4s are documented here.
 
-## [Unreleased]
+## [0.3.0] — 2026-03-28
 
 ### Added
 
-- **`bug-hunt` command** — deterministic AST-based scanner for 15 common bug patterns (SQL injection, insecure deserialization, hardcoded secrets, unsafe casts, null usage, resource leaks, ZIO/Akka concurrency issues). Bloom filter pre-screening, parallel scan, hotspot ranking (complexity × git churn). Supports `--severity`, `--bug-category`, `--hotspots`, `--json`
-- **`/intel4s:bug-hunt` skill** — orchestrates full pipeline: scan → LLM triage → GitHub issues cross-reference (optional) → reproduction generation → structured report
+- **`bug-hunt` command** — AST-based vulnerability scanner with 45 patterns across 7 categories (security, type safety, concurrency, effects, resources, crypto, XML). Bloom filter pre-screening, parallel scan, hotspot ranking (complexity × git churn). Supports `--severity`, `--bug-category`, `--hotspots`, `--no-taint`, `--json`
+- **Full taint analysis** — on by default. Constant propagation (suppresses literal-derived sinks), intraprocedural backward slice (traces taint from HTTP params to SQL/exec/file sinks), cross-file analysis via scalex index (max 3 hops), sanitizer detection, conditional guard detection, string/collection propagation rules, parameter taint inference, multi-factor confidence scoring
+- **45 bug patterns**: SQL injection, XSS, SSRF, XXE, command injection, path traversal, open redirect, regex DoS, LDAP injection, insecure deserialization, Jackson enableDefaultTyping, hardcoded secrets, weak hash (MD5/SHA1), weak cipher (DES/RC4), weak random, hardcoded IV, ECB mode, NoPadding, log injection, ZIO.die, unsafeRun, blocking in effect, ignored Future, Future.onComplete, .get on Option, .head/.last/.tail on collection, asInstanceOf, null literal, return in lambda, throw in ZIO.succeed, Await.result(Duration.Inf), Thread.sleep, sender() in Future, nested synchronized, var+Future, mutable shared, Try.get, partial match, resource leaks (Source/Stream/Connection)
+- **Smart false positive reduction**: ZIO Ref.get vs Option.get, tapir endpoint builders, assertion context suppression, effect chains (.get.map), for-comprehension bindings
+- **`/intel4s:bug-hunt` skill** — orchestrates: scan → LLM triage → GitHub issues cross-reference (optional) → reproduction generation → structured report
 
 ## [0.2.0] — 2026-03-27
 
