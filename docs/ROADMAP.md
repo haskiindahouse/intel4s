@@ -4,6 +4,22 @@
 
 - [ ] Publish plugin to Claude Code marketplace
 
+### Enhanced secret detection (inspired by Claude Code secretScanner)
+
+- [x] Regex-based credential VALUE scanning — 16 high-confidence patterns (AWS, GCP, GitHub, GitLab, Slack, Stripe, OpenAI, Anthropic, private keys, HuggingFace, SendGrid, npm, PyPI, Databricks)
+- [x] `HardcodedCredential` BugPattern with specific rule ID in finding message
+- [x] Extended `isPlaceholder` to reduce false positives
+
+### Structured MCP error responses
+
+- [x] `_meta.errorCategory` field in tool results — `not_found`, `usage_error`, `timeout`, `parse_error`, `internal_error`
+- [x] Direct `CmdResult` classification via `classifyResult()` — no string-matching heuristics
+
+### Rename dry-run mode
+
+- [x] `--apply` flag for rename — dry-run preview by default, write to disk with `--apply`
+- [x] File staleness check before writing — compare expected line content to current disk content (TOCTOU protection)
+
 ### Bug hunt — automated vulnerability and bug pattern detection
 
 - [x] `bug-hunt` command — AST-based scanner for 15 Tier 1 patterns (SQL injection, insecure deserialization, hardcoded secrets, unsafe casts, null, .get/.head, return in lambda, throw in ZIO.succeed, Await.result(Duration.Inf), Thread.sleep, sender() in Future, resource leaks)

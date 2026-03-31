@@ -47,6 +47,7 @@ case class ParsedFlags(
   bugCategory: Option[String] = None,
   hotspots: Boolean = false,
   noTaint: Boolean = false,
+  applyEdits: Boolean = false,
   cleanArgs: List[String] = Nil,
 )
 
@@ -177,6 +178,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     case i => argList.lift(i + 1)
   val hotspots = argList.contains("--hotspots")
   val noTaint = argList.contains("--no-taint")
+  val applyEdits = argList.contains("--apply")
 
   val cleanArgs = argList.filterNot(a => a.startsWith("--") || a == "-w" || a == "-C" || a == "-e" || a == "-c" || {
     val prev = argList.indexOf(a) - 1
@@ -189,7 +191,7 @@ def parseFlags(argList: List[String]): ParsedFlags =
     hasMethodFilter, extendsFilter, bodyContainsFilter, focusPackage, expandDepth, membersLimit,
     brief, strict, usedByFilter, returnsFilter, takesFilter, shallow, noDoc, excludePath, topN,
     summaryMode, timingsEnabled, withBody, maxBodyLines, showImports, offset, related, explainMode,
-    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, bugSeverity, bugCategory, hotspots, noTaint, cleanArgs)
+    concise, maxOutput, inPackageFilter, eachMethod, semantic, framework, bugSeverity, bugCategory, hotspots, noTaint, applyEdits, cleanArgs)
 
 private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
                            batchMode: Boolean = false, effectiveNoTests: Option[Boolean] = None): CommandContext =
@@ -216,7 +218,8 @@ private def flagsToContext(f: ParsedFlags, idx: WorkspaceIndex, workspace: Path,
     bugSeverity = f.bugSeverity,
     bugCategory = f.bugCategory,
     hotspots = f.hotspots,
-    noTaint = f.noTaint)
+    noTaint = f.noTaint,
+    applyEdits = f.applyEdits)
 
 @main def main(args: String*): Unit =
   val f = parseFlags(args.toList)

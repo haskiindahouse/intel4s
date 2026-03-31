@@ -1,4 +1,4 @@
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 import scala.jdk.CollectionConverters.*
 
 // ── Formatting ──────────────────────────────────────────────────────────────
@@ -1305,12 +1305,16 @@ private def renderRenameResult(r: CmdResult.RenameResult, ctx: CommandContext): 
       val rel = jsonEscape(ctx.workspace.relativize(e.file).toString)
       s"""{"file":"$rel","line":${e.line},"category":"${e.category}","old":"${jsonEscape(e.oldLine)}","new":"${jsonEscape(e.newLine)}"}"""
     }.mkString("[", ",", "]")
-    println(s"""{"from":"${jsonEscape(r.oldName)}","to":"${jsonEscape(r.newName)}","editCount":${r.edits.size},"edits":$edits}""")
+    val appliedField = if ctx.applyEdits then ""","applied":true""" else ""
+    println(s"""{"from":"${jsonEscape(r.oldName)}","to":"${jsonEscape(r.newName)}","editCount":${r.edits.size},"edits":$edits$appliedField}""")
+    if ctx.applyEdits && r.edits.nonEmpty then
+      applyRenameEdits(r.edits, ctx.workspace)
   } else {
     if r.edits.isEmpty then
       println(s"""No occurrences of "${r.oldName}" found to rename""")
     else {
-      println(s"""Rename "${r.oldName}" → "${r.newName}" — ${r.edits.size} edits in ${r.edits.map(_.file).distinct.size} files:""")
+      val mode = if ctx.applyEdits then "Applying" else "Preview"
+      println(s"""$mode rename "${r.oldName}" → "${r.newName}" — ${r.edits.size} edits in ${r.edits.map(_.file).distinct.size} files:""")
       println()
       var lastFile: Path = null
       r.edits.foreach { e =>
@@ -1323,8 +1327,66 @@ private def renderRenameResult(r: CmdResult.RenameResult, ctx: CommandContext): 
         println(s"    L${e.line} [${e.category}]  ${e.oldLine}")
         println(s"    ${" " * (e.line.toString.length + 1)} →  ${e.newLine}")
       }
+      if ctx.applyEdits then {
+        println()
+        applyRenameEdits(r.edits, ctx.workspace)
+      } else {
+        println()
+        println("(dry run — pass --apply to write changes to disk)")
+      }
     }
   }
+}
+
+/** Apply rename edits to disk with staleness protection.
+  * Compares expected line content against current file content before writing.
+  * If a file has been modified since indexing, its edits are skipped entirely. */
+private def applyRenameEdits(edits: List[RenameEdit], workspace: Path): Unit = {
+  val byFile = edits.groupBy(_.file)
+  var applied = 0
+  var skipped = 0
+  var staleCount = 0
+
+  byFile.foreach { (file, fileEdits) =>
+    val lines = try Files.readAllLines(file).asScala.toArray catch
+      case e: Exception =>
+        System.err.println(s"  ERROR: cannot read ${workspace.relativize(file)}: ${e.getMessage}")
+        skipped += fileEdits.size
+        null
+
+    if lines != null then {
+      // Staleness check: verify each edit's expected content matches current disk state
+      val staleEdits = fileEdits.filter { e =>
+        val idx = e.line - 1
+        idx < 0 || idx >= lines.length || lines(idx).trim != e.oldLine
+      }
+
+      if staleEdits.nonEmpty then {
+        val rel = workspace.relativize(file)
+        System.err.println(s"  SKIPPED $rel — file changed since indexing (${staleEdits.size} stale edits)")
+        staleCount += 1
+        skipped += fileEdits.size
+      } else {
+        // Apply edits sorted by line descending to preserve line numbers
+        fileEdits.sortBy(-_.line).foreach { e =>
+          val idx = e.line - 1
+          lines(idx) = lines(idx).replace(e.oldLine, e.newLine)
+        }
+        try {
+          Files.writeString(file, lines.mkString("\n") + "\n")
+          applied += fileEdits.size
+        } catch
+          case e: Exception =>
+            System.err.println(s"  ERROR: cannot write ${workspace.relativize(file)}: ${e.getMessage}")
+            skipped += fileEdits.size
+      }
+    }
+  }
+
+  val fileCount = byFile.size - staleCount
+  println(s"Applied $applied edit${if applied != 1 then "s" else ""} to $fileCount file${if fileCount != 1 then "s" else ""}.")
+  if skipped > 0 then
+    println(s"Skipped $skipped edit${if skipped != 1 then "s" else ""} (stale or unreadable files).")
 }
 
 private def renderCallGraph(r: CmdResult.CallGraph, ctx: CommandContext): Unit = {

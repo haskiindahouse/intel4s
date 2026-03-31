@@ -245,20 +245,22 @@ object McpServer:
         val flags = parseFlags(allArgs)
         Timings.enabled = flags.timingsEnabled
 
-        val output =
+        val (result, output) =
           if cmd == "graph" then
             val graphArgs = query.map(q => List("--render", q)).getOrElse(Nil) ++
               extraArgs.filterNot(_ == "--parse") // --parse reads stdin, not available in MCP
             val dummyIdx = WorkspaceIndex(wsPath, needBlooms = false)
             val ctx = flagsToContext(flags, dummyIdx, wsPath)
-            captureOutput { renderWithBudget(cmdGraph(graphArgs, ctx), ctx) }
+            val r = cmdGraph(graphArgs, ctx)
+            (r, captureOutput { renderWithBudget(r, ctx) })
           else if cmd == "index" then
             indexCache.remove(wsPath)
             val idx = WorkspaceIndex(wsPath, needBlooms = true)
             idx.index()
             indexCache(wsPath) = idx
             val ctx = flagsToContext(flags, idx, wsPath)
-            captureOutput { renderWithBudget(cmdIndex(Nil, ctx), ctx) }
+            val r = cmdIndex(Nil, ctx)
+            (r, captureOutput { renderWithBudget(r, ctx) })
           else
             val idx = indexCache.getOrElseUpdate(wsPath, {
               val i = WorkspaceIndex(wsPath, needBlooms = true)
@@ -268,18 +270,33 @@ object McpServer:
             idx.index() // incremental update — checks OIDs, re-parses only changed files
             val effectiveNoTests = if cmd == "overview" && !flags.includeTests then true else flags.noTests
             val ctx = flagsToContext(flags, idx, wsPath, effectiveNoTests = Some(effectiveNoTests))
-            captureOutput { runCommand(cmd, flags.cleanArgs, ctx) }
+            val handler = commands.getOrElse(cmd, (_: List[String], _: CommandContext) => CmdResult.UsageError(s"Unknown command: $cmd"))
+            val r = handler(flags.cleanArgs, ctx)
+            (r, captureOutput { renderWithBudget(r, ctx) })
 
         Timings.report()
         Timings.enabled = false
-        toolResult(id, output)
+        val category = classifyResult(result)
+        toolResult(id, output, isError = category.isDefined, errorCategory = category)
       catch
         case e: Exception =>
           Timings.enabled = false
           val msg = Option(e.getMessage).getOrElse(e.getClass.getName)
-          toolResult(id, s"Error: $msg", isError = true)
+          val category = if msg.toLowerCase.contains("parse") then "parse_error" else "internal_error"
+          toolResult(id, s"Error: $msg", isError = true, errorCategory = Some(category))
 
   // ── Helpers ─────────────────────────────────────────────────────────────
+
+  private def classifyResult(result: CmdResult): Option[String] = result match
+    case _: CmdResult.NotFound => Some("not_found")
+    case _: CmdResult.UsageError => Some("usage_error")
+    case r: CmdResult.BugHuntReport if r.timedOut => Some("timeout")
+    case r: CmdResult.RefList if r.timedOut => Some("timeout")
+    case r: CmdResult.CategorizedRefs if r.timedOut => Some("timeout")
+    case r: CmdResult.FlatRefs if r.timedOut => Some("timeout")
+    case r: CmdResult.GrepCount if r.timedOut => Some("timeout")
+    case r: CmdResult.GrepByMethod if r.timedOut => Some("timeout")
+    case _ => None
 
   private def captureOutput(block: => Unit): String =
     val baos = ByteArrayOutputStream()
@@ -290,9 +307,10 @@ object McpServer:
     finally System.setOut(savedOut)
     baos.toString("UTF-8").stripTrailing()
 
-  private def toolResult(id: McpJson, text: String, isError: Boolean = false): String =
+  private def toolResult(id: McpJson, text: String, isError: Boolean = false, errorCategory: Option[String] = None): String =
     val errField = if isError then ""","isError":true""" else ""
-    jsonRpcResult(id, s"""{"content":[{"type":"text","text":"${jsonEscape(text)}"}]$errField}""")
+    val metaField = errorCategory.map(cat => s""","_meta":{"errorCategory":"$cat"}""").getOrElse("")
+    jsonRpcResult(id, s"""{"content":[{"type":"text","text":"${jsonEscape(text)}"}]$errField$metaField}""")
 
   private def jsonRpcResult(id: McpJson, result: String): String =
     s"""{"jsonrpc":"2.0","id":${formatId(id)},"result":$result}"""

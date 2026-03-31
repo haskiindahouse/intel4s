@@ -2,6 +2,15 @@
 
 All notable changes to intel4s are documented here.
 
+## [0.5.0] — 2026-03-31
+
+### Added
+
+- **Regex-based credential detection** in `bug-hunt` — 16 high-confidence patterns (AWS access tokens, GitHub PATs, Anthropic/OpenAI API keys, private keys, Slack tokens, Stripe keys, GitLab PATs, npm/PyPI tokens, etc.) scanned against string literal values. Complements existing variable-name detection (`HardcodedSecret`). Ported from gitleaks rules via Claude Code's secretScanner
+- **Structured MCP error responses** — `_meta.errorCategory` field in tool results for programmatic error handling. Categories: `not_found`, `usage_error`, `timeout`, `parse_error`, `internal_error`. MCP clients can now distinguish error types without parsing message strings
+- **Rename dry-run mode** — `rename` now shows a preview by default. Pass `--apply` to write changes to disk. Includes file staleness protection: compares expected line content against current disk state before writing, skips files modified since indexing (TOCTOU protection)
+- Extended `isPlaceholder()` — additional placeholder patterns reduce false positives in secret detection (`"your-key-here"`, `"example"`, `"^[x*]+$"`, etc.)
+
 ## [0.4.0] — 2026-03-28
 
 ### Added

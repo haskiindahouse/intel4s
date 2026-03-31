@@ -196,6 +196,8 @@ enum BugPattern(val severity: BugSeverity, val category: BugCategory, val descri
   // ── Regex ──
   case RegexDoS          extends BugPattern(BugSeverity.High,     BugCategory.Security,     "Regex compiled from user input — ReDoS (regex denial of service)")
   case LDAPInjection     extends BugPattern(BugSeverity.High,     BugCategory.Security,     "LDAP query with non-literal filter — LDAP injection")
+  // ── Credential value detection ──
+  case HardcodedCredential extends BugPattern(BugSeverity.Critical, BugCategory.Security,   "hardcoded credential detected in string literal (regex match)")
 
 case class BugFinding(
   file: Path,
@@ -259,6 +261,7 @@ case class CommandContext(
   bugCategory: Option[String] = None,
   hotspots: Boolean = false,
   noTaint: Boolean = false,
+  applyEdits: Boolean = false,
 ):
   val fmt: (SymbolInfo, Path) => String = if verbose then formatSymbolVerbose else formatSymbol
   val jRef: Reference => String =
