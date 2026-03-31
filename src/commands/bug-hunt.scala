@@ -309,6 +309,14 @@ private def scanFile(
         if context.contains("synchronized") =>
         report(localFindings, filePath, relPath, app.pos, lines, BugPattern.SynchronizedNested, context)
 
+      // ── Credential value detection (regex-based) ──
+      case lit @ Lit.String(value) if value.length >= 20 && !isPlaceholder(value) =>
+        credentialRules.foreach { rule =>
+          if rule.pattern.findFirstIn(value).isDefined then
+            report(localFindings, filePath, relPath, lit.pos, lines, BugPattern.HardcodedCredential, context,
+              messageOverride = Some(s"hardcoded ${ruleIdToLabel(rule.id)} detected in string literal"))
+        }
+
       // ── Type safety extended ──
       case sel @ Term.Select(_, Term.Name("tail")) if !context.contains("assertion") =>
         report(localFindings, filePath, relPath, sel.pos, lines, BugPattern.CollectionLast, context)
@@ -386,7 +394,8 @@ private def isLiteralArg(t: Tree): Boolean = t match
 private def report(
   findings: java.util.concurrent.ConcurrentLinkedQueue[BugFinding],
   filePath: Path, relPath: String, pos: Position, lines: Array[String],
-  pattern: BugPattern, context: List[String]
+  pattern: BugPattern, context: List[String],
+  messageOverride: Option[String] = None
 ): Unit =
   val line = pos.startLine + 1 // scalameta is 0-indexed
   val contextLine = if line > 0 && line <= lines.length then lines(line - 1).trim else ""
@@ -397,7 +406,7 @@ private def report(
     pattern = pattern,
     contextLine = contextLine,
     enclosingSymbol = enclosing,
-    message = pattern.description
+    message = messageOverride.getOrElse(pattern.description)
   ))
 
 private def isSafeGet(sel: Term.Select, qual: Term, context: List[String]): Boolean =
@@ -465,7 +474,40 @@ private def isPlaceholder(value: String): Boolean =
   val lower = value.toLowerCase
   lower == "changeme" || lower == "xxx" || lower == "todo" || lower == "fixme" ||
   lower.startsWith("${") || lower.startsWith("$") || lower == "placeholder" ||
-  lower == "test" || lower == "dummy" || lower.isEmpty
+  lower == "test" || lower == "dummy" || lower.isEmpty ||
+  lower == "your-key-here" || lower == "replace-me" || lower == "example" ||
+  lower.startsWith("<") || lower.contains("example.com") || lower == "none" ||
+  lower.matches("^[x*]+$") || lower.matches("^0+$")
+
+// ── Credential value detection (ported from Claude Code secretScanner) ─────
+
+private val credentialRules: List[(id: String, pattern: scala.util.matching.Regex)] = List(
+  (id = "aws-access-token",         pattern = """(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}""".r),
+  (id = "gcp-api-key",              pattern = """AIza[\w\-]{35}""".r),
+  (id = "anthropic-api-key",        pattern = """sk-ant-(?:api)?03-[a-zA-Z0-9_\-]{80,100}AA""".r),
+  (id = "anthropic-admin-key",      pattern = """sk-ant-admin01-[a-zA-Z0-9_\-]{80,100}AA""".r),
+  (id = "openai-api-key",           pattern = """sk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{40,80}T3BlbkFJ[A-Za-z0-9_\-]{20,80}""".r),
+  (id = "github-pat",               pattern = """ghp_[0-9a-zA-Z]{36}""".r),
+  (id = "github-fine-grained-pat",  pattern = """github_pat_\w{82}""".r),
+  (id = "github-app-token",         pattern = """(?:ghu|ghs)_[0-9a-zA-Z]{36}""".r),
+  (id = "gitlab-pat",               pattern = """glpat-[\w\-]{20}""".r),
+  (id = "slack-bot-token",          pattern = """xoxb-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9\-]*""".r),
+  (id = "stripe-access-token",      pattern = """(?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99}""".r),
+  (id = "npm-access-token",         pattern = """npm_[a-zA-Z0-9]{36}""".r),
+  (id = "private-key",              pattern = """-----BEGIN[ A-Z0-9_\-]{0,100}PRIVATE KEY""".r),
+  (id = "huggingface-access-token", pattern = """hf_[a-zA-Z]{34}""".r),
+  (id = "sendgrid-api-token",       pattern = """SG\.[a-zA-Z0-9=_\-.]{66}""".r),
+  (id = "pypi-upload-token",        pattern = """pypi-AgEIcHlwaS5vcmc[\w\-]{50,}""".r),
+)
+
+private def ruleIdToLabel(ruleId: String): String =
+  val specialCases = Map(
+    "aws" -> "AWS", "gcp" -> "GCP", "api" -> "API", "pat" -> "PAT",
+    "github" -> "GitHub", "gitlab" -> "GitLab", "openai" -> "OpenAI",
+    "npm" -> "NPM", "pypi" -> "PyPI", "huggingface" -> "HuggingFace",
+    "anthropic" -> "Anthropic", "sendgrid" -> "SendGrid",
+  )
+  ruleId.split('-').map(w => specialCases.getOrElse(w, w.capitalize)).mkString(" ")
 
 // ── Hotspot ranking ────────────────────────────────────────────────────────
 
