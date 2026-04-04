@@ -39,6 +39,11 @@ jobs:
             exit 1
           fi
 
+      - name: Configure git for tests
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@test"
+
       - name: Run all tests
         run: scala-cli test src/ tests/
 

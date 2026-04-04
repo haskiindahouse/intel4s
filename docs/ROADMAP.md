@@ -1,8 +1,78 @@
-# Scalex — Roadmap
+# agent4s — Roadmap
 
-## Pending
+## Strategic Vision
 
-- [ ] Publish plugin to Claude Code marketplace
+**Goal:** Every Scala project uses agent4s — the standard code intelligence layer for AI agents working with Scala.
+
+**Positioning:** The only build-free Scala code intelligence tool for AI agents. Metals requires compilation; grep has no structure; agent4s gives instant structured answers from `git clone` to first query in <1 second.
+
+**Addressable market:** ~500K Scala developers, $146K avg salary, concentrated in finance, data engineering, big tech. "Tooling" is #1 pain point in Scala community surveys. 92% of developers use AI coding tools daily.
+
+**Competitive moat:**
+- Zero-setup (no build server, no compilation, no classpath)
+- 349ms warm index on 18.5K files (Metals needs minutes for initial build)
+- 45 Scala-specific bug patterns (ZIO, Cats Effect, concurrency) — no competitor has this
+- Dual delivery: Claude Code plugin + MCP server (Cursor, Windsurf, Cline)
+- Offline, local, private — code never leaves the machine
+
+---
+
+## Phase 1: Distribution & Visibility (Q2 2026)
+
+*Goal: Get discovered. First 1,000 installs.*
+
+- [ ] **Publish to Claude Code marketplace** — #1 blocker for adoption. Only 834 plugins total; first-mover advantage for Scala
+- [ ] **MCP quick-start templates** — copy-paste configs for Cursor, Windsurf, Cline, OpenCode in README and site
+- [ ] **Windows native image** — expand platform coverage from macOS+Linux to include Windows x64 (GraalVM)
+- [ ] **Landing page SEO** — update `docs/site/index.html` with meta tags, structured data, "Scala AI tool" keywords
+- [ ] **Scala community launch** — post on Scala Contributors, r/scala, Scala Discord, X/Twitter. Demo: "from git clone to finding dead code in 5 seconds"
+- [ ] **Homebrew formula** — `brew install scala-digest/tap/agent4s` for macOS
+- [ ] **GitHub Action** — `scala-digest/agent4s-action@v1` for CI pipelines (unused code check, bug-hunt on PRs)
+
+## Phase 2: Zero Friction (Q3 2026)
+
+*Goal: Install → value in 30 seconds. Eliminate every setup step.*
+
+- [ ] **Auto-SemanticDB detection** — if `.semanticdb` files exist, auto-enable `--semantic` on rename/call-graph/refs. No manual `/agent4s:semanticdb` needed
+- [ ] **Local definition fallback** — when `def` returns 0, parse candidate files on-the-fly for local defs/vals inside method bodies. Zero index growth
+- [ ] **Reduce bug-hunt false positives** — ZIO `Ref.get` vs `Option.get`, tapir endpoint `.get`, collection `.head` in pattern match guards
+- [ ] **Tier 2 bug patterns** — unhandled Future failures, non-exhaustive match, fiber leaks, unchecked `.asInstanceOf` in generic code
+- [ ] **`--format agent` compact output** — token-efficient output mode for AI agents (deferred from earlier — reconsider with `--max-output` experience)
+- [ ] **Warm-load target: <200ms** — investigate string pool sharing across indexes, arena allocation for deserialization
+
+## Phase 3: Ecosystem Lock-in (Q4 2026)
+
+*Goal: Once you set up agent4s, you can't go back. Integration with every tool Scala devs use.*
+
+- [ ] **VS Code extension** — wrap MCP server in a VS Code extension with one-click install. Status bar showing index state, quick-pick for commands
+- [ ] **Kotlin support** — reuse JVM extraction pipeline (JavaParser already works). Kotlin AST via kotlin-compiler-embeddable. Expand addressable market to Kotlin+Scala mixed projects
+- [ ] **Metals bridge** — when Metals is running, optionally use its data for enhanced type info. agent4s stays independent but gets richer when Metals is available
+- [ ] **Dependency vulnerability scanning** — parse `build.sbt`/`build.sc`/`project.scala` for deps, check against OSV/NVD/GitHub Advisory. `/agent4s:deps-audit` skill
+- [ ] **SBOM generation** — `agent4s sbom` outputs CycloneDX/SPDX from build files + indexed symbols. Enterprise compliance requirement
+- [ ] **Docker image** — `docker run ghcr.io/scala-digest/agent4s search . MyClass` for CI/CD and ephemeral environments
+
+## Phase 4: Enterprise & Scale (H1 2027)
+
+*Goal: Win finance, big tech, and data engineering teams. Handle 100K+ file monorepos.*
+
+- [ ] **Monorepo optimizations** — multi-module index sharding (index per sbt subproject/Mill module), parallel module indexing, cross-module reference resolution
+- [ ] **GitHub App** — automated PR reviews: dead code detection, bug-hunt findings as PR comments, unused import cleanup suggestions
+- [ ] **Team analytics dashboard** — track codebase health metrics over time (dead code %, bug pattern trends, test coverage evolution). Web UI reading from `agent4s audit --json` output
+- [ ] **Compliance skills** — `/agent4s:license-audit` (scan deps for copyleft/proprietary), `/agent4s:security-baseline` (enforce zero critical findings policy)
+- [ ] **Private registry** — enterprise customers host their own marketplace with custom skills (proprietary patterns, internal coding standards)
+
+## Phase 5: Platform (H2 2027)
+
+*Goal: agent4s becomes the universal code intelligence layer for AI agents, not just Scala.*
+
+- [ ] **Language-agnostic core** — extract AST parsing into pluggable backends. Core engine handles indexing, caching, bloom filters, MCP. Language modules handle parsing
+- [ ] **Java first-class support** — JavaParser already works for basic extraction. Expand to full feature parity with Scala (refs, unused, bug-hunt, call-graph)
+- [ ] **Cloud-hosted indexing** — agent4s-as-a-service for large codebases. Index once, query from any agent. Useful for CI/CD and team-shared indexes
+- [ ] **Agent orchestration SDK** — expose agent4s as a library for building custom Scala analysis tools and skills
+
+---
+
+## Pending (current sprint)
 
 ### Enhanced secret detection (inspired by Claude Code secretScanner)
 
