@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to intel4s are documented here.
+All notable changes to agent4s are documented here.
 
 ## [0.5.0] — 2026-03-31
 
@@ -16,13 +16,13 @@ All notable changes to intel4s are documented here.
 ### Added
 
 - **7 refactoring skills** inspired by the impeccable plugin's dimensional approach:
-  - `/intel4s:audit` — full codebase audit across 8 dimensions (security, dead code, complexity, test coverage, architecture, style, error handling, dependencies)
-  - `/intel4s:critique` — architecture evaluation (type hierarchy, coupling, cohesion, effect system, API surface, pattern consistency, testability)
-  - `/intel4s:polish` — final quality pass (naming, imports, docs, method signatures, redundancy, type safety, consistency)
-  - `/intel4s:normalize` — discover project conventions, find deviations, align code to majority patterns
-  - `/intel4s:harden` — production hardening (input validation, timeouts, retries, resource safety, null safety, concurrency, graceful degradation)
-  - `/intel4s:simplify` — reduce complexity (dead code removal, flatten inheritance, extract methods, remove abstractions, inline delegation)
-  - `/intel4s:extract` — identify duplication, extract reusable components (traits, type classes, utilities, modules). Rule of three enforced
+  - `/agent4s:audit` — full codebase audit across 8 dimensions (security, dead code, complexity, test coverage, architecture, style, error handling, dependencies)
+  - `/agent4s:critique` — architecture evaluation (type hierarchy, coupling, cohesion, effect system, API surface, pattern consistency, testability)
+  - `/agent4s:polish` — final quality pass (naming, imports, docs, method signatures, redundancy, type safety, consistency)
+  - `/agent4s:normalize` — discover project conventions, find deviations, align code to majority patterns
+  - `/agent4s:harden` — production hardening (input validation, timeouts, retries, resource safety, null safety, concurrency, graceful degradation)
+  - `/agent4s:simplify` — reduce complexity (dead code removal, flatten inheritance, extract methods, remove abstractions, inline delegation)
+  - `/agent4s:extract` — identify duplication, extract reusable components (traits, type classes, utilities, modules). Rule of three enforced
 - **End-to-end pipeline**: setup → explore → audit → bug-hunt → critique → harden → simplify → normalize → extract → polish → verify
 - Total plugin skills: 13. Total with agent: 14 components
 
@@ -34,16 +34,16 @@ All notable changes to intel4s are documented here.
 - **Full taint analysis** — on by default. Constant propagation (suppresses literal-derived sinks), intraprocedural backward slice (traces taint from HTTP params to SQL/exec/file sinks), cross-file analysis via scalex index (max 3 hops), sanitizer detection, conditional guard detection, string/collection propagation rules, parameter taint inference, multi-factor confidence scoring
 - **45 bug patterns**: SQL injection, XSS, SSRF, XXE, command injection, path traversal, open redirect, regex DoS, LDAP injection, insecure deserialization, Jackson enableDefaultTyping, hardcoded secrets, weak hash (MD5/SHA1), weak cipher (DES/RC4), weak random, hardcoded IV, ECB mode, NoPadding, log injection, ZIO.die, unsafeRun, blocking in effect, ignored Future, Future.onComplete, .get on Option, .head/.last/.tail on collection, asInstanceOf, null literal, return in lambda, throw in ZIO.succeed, Await.result(Duration.Inf), Thread.sleep, sender() in Future, nested synchronized, var+Future, mutable shared, Try.get, partial match, resource leaks (Source/Stream/Connection)
 - **Smart false positive reduction**: ZIO Ref.get vs Option.get, tapir endpoint builders, assertion context suppression, effect chains (.get.map), for-comprehension bindings
-- **`/intel4s:bug-hunt` skill** — orchestrates: scan → LLM triage → GitHub issues cross-reference (optional) → reproduction generation → structured report
+- **`/agent4s:bug-hunt` skill** — orchestrates: scan → LLM triage → GitHub issues cross-reference (optional) → reproduction generation → structured report
 
 ## [0.2.0] — 2026-03-27
 
 ### Added
 
-- **`/intel4s:setup` skill** — one-time project onboarding; detects build tool, runs scalex overview, writes Scala Code Intelligence section to CLAUDE.md with available skills, SemanticDB status, and usage guidance
-- **`/intel4s:semanticdb` skill** — enables SemanticDB in build config (sbt/mill/scala-cli/gradle); detects Scala version, applies the right setting, compiles, and verifies `.semanticdb` files were generated
-- **`/intel4s:upgrade` skill** — upgrades scalex binary to latest GitHub release; clears cache and re-downloads
-- **`/intel4s:doctor` skill** — diagnostic check: binary version, index health, SemanticDB availability, CLAUDE.md configuration, macOS quarantine
+- **`/agent4s:setup` skill** — one-time project onboarding; detects build tool, runs scalex overview, writes Scala Code Intelligence section to CLAUDE.md with available skills, SemanticDB status, and usage guidance
+- **`/agent4s:semanticdb` skill** — enables SemanticDB in build config (sbt/mill/scala-cli/gradle); detects Scala version, applies the right setting, compiles, and verifies `.semanticdb` files were generated
+- **`/agent4s:upgrade` skill** — upgrades scalex binary to latest GitHub release; clears cache and re-downloads
+- **`/agent4s:doctor` skill** — diagnostic check: binary version, index health, SemanticDB availability, CLAUDE.md configuration, macOS quarantine
 - **`scala-expert` agent** — auto-invoked by Claude for complex multi-step Scala tasks (refactoring, impact analysis, codebase exploration); chains 3+ scalex commands using built-in workflow recipes
 - Extracted shared workflow recipes to `references/workflows.md` — single source of truth for SKILL.md and scala-expert agent
 

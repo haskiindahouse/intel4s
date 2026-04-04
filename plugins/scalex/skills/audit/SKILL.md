@@ -114,10 +114,10 @@ bash "<scalex-cli>" deps <HubType> --depth 2 -w "<project>"
 [Inconsistencies, naming, patterns]
 
 ### Recommended Actions (prioritized)
-1. [Critical] Fix security issue X — use `/intel4s:bug-hunt` for details
-2. [High] Remove dead code — use `/intel4s:simplify`
+1. [Critical] Fix security issue X — use `/agent4s:bug-hunt` for details
+2. [High] Remove dead code — use `/agent4s:simplify`
 3. [Medium] Improve test coverage — use `scaffold test`
-4. [Low] Normalize naming — use `/intel4s:normalize`
+4. [Low] Normalize naming — use `/agent4s:normalize`
 ```
 
 NEVER:

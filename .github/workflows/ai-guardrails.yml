@@ -1,0 +1,48 @@
+# AI Quality Gates — blocks merge on compilation warnings, test failures, or leaked secrets.
+# See docs/adr/ for architectural decisions and CLAUDE.md for invariants.
+name: AI Quality Gates
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: VirtusLab/scala-cli-setup@59e308800210b0414d2d7190068c80021e1b3e5d # v1
+        with:
+          power: true
+          jvm: 21
+
+      - name: Compile (zero warnings)
+        run: |
+          OUTPUT=$(scala-cli compile src/ 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qi warn; then
+            echo "::error::Compilation produced warnings. Zero warnings policy — see CLAUDE.md."
+            exit 1
+          fi
+
+      - name: Compile (zero deprecations)
+        run: |
+          OUTPUT=$(scala-cli compile --scalac-option "-deprecation" src/ 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qi warn; then
+            echo "::error::Deprecated API usage detected. Zero deprecations policy — see CLAUDE.md."
+            exit 1
+          fi
+
+      - name: Run all tests
+        run: scala-cli test src/ tests/
+
+      - name: Secrets scan
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

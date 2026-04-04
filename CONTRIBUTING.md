@@ -1,11 +1,11 @@
-# Contributing to intel4s
+# Contributing to agent4s
 
 ## Development Setup
 
 ```bash
 # Prerequisites: JDK 21+, scala-cli
-git clone https://github.com/haskiindahouse/intel4s.git
-cd intel4s
+git clone https://github.com/scala-digest/agent4s.git
+cd agent4s
 
 # Run from source
 scala-cli run src/ -- search . MyClass

@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>intel4s — Code Intelligence for Scala</title>
+    <title>agent4s — Code Intelligence for Scala</title>
 
     <meta name="description" content="Code intelligence for Scala. Works without a build. Gets smarter when you compile." />
-    <meta property="og:title" content="intel4s — Code Intelligence for Scala" />
+    <meta property="og:title" content="agent4s — Code Intelligence for Scala" />
     <meta property="og:description" content="Semantic rename, call-graph, dead code detection. No build server needed — type-aware when compiled." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="intel4s — Code Intelligence for Scala" />
+    <meta name="twitter:title" content="agent4s — Code Intelligence for Scala" />
     <meta name="twitter:description" content="Works without a build. Gets smarter when you compile." />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -146,7 +146,7 @@
     <!-- ======= SLIDE 1: TITLE ======= -->
     <section class="slide title-slide" data-slide="0">
       <div class="slide-content">
-        <img src="vulture.png" alt="intel4s" width="200" class="reveal" style="filter: drop-shadow(0 0 30px var(--accent-glow));">
+        <img src="vulture.png" alt="agent4s" width="200" class="reveal" style="filter: drop-shadow(0 0 30px var(--accent-glow));">
         <h1 class="reveal">intel<span class="accent">4s</span></h1>
         <p class="title-tagline reveal">
           Code intelligence for Scala.<br>
@@ -198,7 +198,7 @@
         <p class="subtitle reveal">Text-based by default. Type-aware when compiled. One flag: <span class="mono accent">--semantic</span>.</p>
         <div class="compare reveal">
           <div class="terminal compare-bad">
-            <pre><span class="t-dim">$ intel4s rename Config AppConfig</span>
+            <pre><span class="t-dim">$ agent4s rename Config AppConfig</span>
 
 <span class="t-red">6 edits in 3 files</span>  ← hits BOTH packages
 
@@ -208,7 +208,7 @@
     <span class="t-red">Config → AppConfig</span>   ✗ WRONG package!</pre>
           </div>
           <div class="terminal compare-good">
-            <pre><span class="t-dim">$ intel4s rename Config AppConfig <span class="t-accent">--semantic</span></span>
+            <pre><span class="t-dim">$ agent4s rename Config AppConfig <span class="t-accent">--semantic</span></span>
 
 <span class="t-green">2 edits in 1 file</span>   ← only app.Config
 
@@ -265,7 +265,7 @@
         <h2 class="reveal">See the <span class="accent">flow</span>.</h2>
         <p class="subtitle reveal">One command. Both directions.</p>
         <div class="terminal reveal">
-          <pre><span class="t-dim">$ intel4s call-graph processPayment --in PaymentService --semantic</span>
+          <pre><span class="t-dim">$ agent4s call-graph processPayment --in PaymentService --semantic</span>
 
 Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/Payment.scala:15)
 
@@ -328,7 +328,7 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
         <div class="card-grid reveal" style="margin-top: var(--content-gap)">
           <div class="card">
             <h3><span class="accent">1,206</span> <span style="color:var(--text-dim)">vs 17</span></h3>
-            <p>Importers found for <span class="mono">Compiler</span>. intel4s resolves wildcard imports. grep misses 98.6%.</p>
+            <p>Importers found for <span class="mono">Compiler</span>. agent4s resolves wildcard imports. grep misses 98.6%.</p>
           </div>
           <div class="card">
             <h3><span class="accent">283</span> refs, <span class="green">categorized</span></h3>
@@ -353,9 +353,9 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
 
 {
   "<span class="t-accent">mcpServers</span>": {
-    "<span class="t-green">intel4s</span>": {
+    "<span class="t-green">agent4s</span>": {
       "type": "stdio",
-      "command": "/path/to/intel4s",
+      "command": "/path/to/agent4s",
       "args": ["mcp"]
     }
   }
@@ -364,14 +364,14 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
           <div class="terminal">
             <pre><span class="t-dim">Claude Code</span>
 
-<span class="t-accent">$</span> /plugin marketplace add haskiindahouse/intel4s
+<span class="t-accent">$</span> /plugin marketplace add scala-digest/agent4s
 <span class="t-green">  ⎿ Successfully added marketplace</span>
 
-<span class="t-accent">$</span> /plugin install intel4s@intel4s-marketplace
+<span class="t-accent">$</span> /plugin install agent4s@agent4s-marketplace
 <span class="t-green">  ⎿ Plugin installed</span>
 
 <span class="t-dim">Then ask:</span>
-<span class="t-green">"use intel4s to explore how
+<span class="t-green">"use agent4s to explore how
  authentication works"</span></pre>
           </div>
         </div>
@@ -387,8 +387,8 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
           <strong>Gets smarter when you compile.</strong>
         </p>
         <div class="cta-row reveal">
-          <a href="https://github.com/haskiindahouse/intel4s" class="cta cta-primary">GitHub →</a>
-          <a href="https://github.com/haskiindahouse/intel4s/releases" class="cta cta-secondary">Releases</a>
+          <a href="https://github.com/scala-digest/agent4s" class="cta cta-primary">GitHub →</a>
+          <a href="https://github.com/scala-digest/agent4s/releases" class="cta cta-secondary">Releases</a>
         </div>
       </div>
     </section>

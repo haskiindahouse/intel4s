@@ -1,7 +1,7 @@
 <p align="center">
-  <img src="docs/vulture.png" alt="intel4s" width="200">
+  <img src="docs/vulture.png" alt="agent4s" width="200">
   <br>
-  <strong>intel4s</strong>
+  <strong>agent4s</strong>
   <br><br>
   <em>Scalameta-based code index for AI agents. Text-based by default, type-aware with SemanticDB.</em>
 </p>
@@ -42,12 +42,12 @@ A CLI that parses Scala source files via [Scalameta](https://scalameta.org/), bu
 ### Claude Code
 
 ```bash
-claude plugins install intel4s
+claude plugins install agent4s
 ```
 
 Then in your project:
 ```
-/intel4s:setup
+/agent4s:setup
 ```
 
 ### MCP Server (Cursor, Windsurf, Cline)
@@ -55,9 +55,9 @@ Then in your project:
 ```json
 {
   "mcpServers": {
-    "intel4s": {
+    "agent4s": {
       "type": "stdio",
-      "command": "/path/to/intel4s",
+      "command": "/path/to/agent4s",
       "args": ["mcp"]
     }
   }
@@ -67,8 +67,8 @@ Then in your project:
 ### CLI
 
 ```bash
-git clone https://github.com/haskiindahouse/intel4s.git
-cd intel4s && ./build-native.sh
+git clone https://github.com/scala-digest/agent4s.git
+cd agent4s && ./build-native.sh
 
 # Or run without building
 scala-cli run src/ -- search /path/to/project MyClass
@@ -81,42 +81,42 @@ scala-cli run src/ -- search /path/to/project MyClass
 ### Search & Navigate
 
 ```bash
-intel4s search Service --kind trait         # fuzzy camelCase search
-intel4s def UserService --verbose           # find definition with signature
-intel4s explain UserService --related       # definition + doc + members + impls in one call
-intel4s hierarchy Compiler --depth 3        # inheritance tree from parsed extends clauses
-intel4s members Signal --inherited          # members including parents
+agent4s search Service --kind trait         # fuzzy camelCase search
+agent4s def UserService --verbose           # find definition with signature
+agent4s explain UserService --related       # definition + doc + members + impls in one call
+agent4s hierarchy Compiler --depth 3        # inheritance tree from parsed extends clauses
+agent4s members Signal --inherited          # members including parents
 ```
 
 ### Refactor
 
 ```bash
-intel4s rename OldName NewName              # text-based, word-boundary safe
-intel4s rename OldName NewName --semantic   # type-aware via SemanticDB (requires compilation)
-intel4s scaffold impl MyServiceLive         # generate override stubs with type param substitution
-intel4s scaffold test MyService             # test skeleton (munit/scalatest/zio-test)
+agent4s rename OldName NewName              # text-based, word-boundary safe
+agent4s rename OldName NewName --semantic   # type-aware via SemanticDB (requires compilation)
+agent4s scaffold impl MyServiceLive         # generate override stubs with type param substitution
+agent4s scaffold test MyService             # test skeleton (munit/scalatest/zio-test)
 ```
 
 ### Analyze
 
 ```bash
-intel4s refs UserService --count            # how many files reference this symbol
-intel4s call-graph processPayment --in Svc  # what it calls + who calls it (by name matching)
-intel4s unused com.legacy                   # symbols with zero external refs (bloom pre-screen + text verify)
-intel4s bug-hunt --hotspots                 # 45 AST patterns + taint heuristics + git churn ranking
-intel4s bug-hunt --severity critical        # only critical patterns (SQL injection, deserialization)
-intel4s coverage UserService                # references in test files only
-intel4s deps Phase --depth 2               # what this symbol depends on (imports + body refs)
+agent4s refs UserService --count            # how many files reference this symbol
+agent4s call-graph processPayment --in Svc  # what it calls + who calls it (by name matching)
+agent4s unused com.legacy                   # symbols with zero external refs (bloom pre-screen + text verify)
+agent4s bug-hunt --hotspots                 # 45 AST patterns + taint heuristics + git churn ranking
+agent4s bug-hunt --severity critical        # only critical patterns (SQL injection, deserialization)
+agent4s coverage UserService                # references in test files only
+agent4s deps Phase --depth 2               # what this symbol depends on (imports + body refs)
 ```
 
 ### Explore
 
 ```bash
-intel4s overview --concise                  # project summary: packages, key types, stats
-intel4s api com.example --used-by com.web   # which symbols are imported by another package
-intel4s diff HEAD~5                         # which symbols changed vs a git ref
-intel4s ast-pattern --extends Phase --has-method run  # structural search by shape
-intel4s grep "pattern" --in ClassName --each-method   # regex scoped to a type's methods
+agent4s overview --concise                  # project summary: packages, key types, stats
+agent4s api com.example --used-by com.web   # which symbols are imported by another package
+agent4s diff HEAD~5                         # which symbols changed vs a git ref
+agent4s ast-pattern --extends Phase --has-method run  # structural search by shape
+agent4s grep "pattern" --in ClassName --each-method   # regex scoped to a type's methods
 ```
 
 <details>
@@ -177,11 +177,11 @@ AST pattern scanner with heuristic taint analysis. Finds common bug patterns wit
 **Taint analysis** (on by default): traces variable assignments backward from sinks to sources within a single method body. If all sink arguments are derived from literals → suppressed. If an argument traces back to an HTTP parameter → enriched with flow chain. Cross-file tracing is limited (checks if callee body directly contains a source, max 3 hops). Not compiler-grade data flow — it's variable name heuristics + AST backward tracing, not type-based.
 
 ```bash
-intel4s bug-hunt -w /path/to/project              # all patterns, taint on
-intel4s bug-hunt --severity critical --no-tests    # critical only, production code
-intel4s bug-hunt --hotspots                        # rank files by findings × git churn
-intel4s bug-hunt --no-taint                        # pattern-only mode (faster)
-intel4s bug-hunt --json                            # structured output for tooling
+agent4s bug-hunt -w /path/to/project              # all patterns, taint on
+agent4s bug-hunt --severity critical --no-tests    # critical only, production code
+agent4s bug-hunt --hotspots                        # rank files by findings × git churn
+agent4s bug-hunt --no-taint                        # pattern-only mode (faster)
+agent4s bug-hunt --json                            # structured output for tooling
 ```
 
 ---
@@ -192,18 +192,18 @@ intel4s bug-hunt --json                            # structured output for tooli
 
 | Skill | What it does |
 |---|---|
-| `/intel4s:setup` | Detect build tool, run overview, write CLAUDE.md section |
-| `/intel4s:semanticdb` | Add `-Xsemanticdb` to build config, compile, verify |
-| `/intel4s:doctor` | Check binary, index, SemanticDB, CLAUDE.md status |
-| `/intel4s:upgrade` | Upgrade binary to latest release |
-| `/intel4s:bug-hunt` | Scan → LLM triage → GitHub issues cross-ref → reproduction |
-| `/intel4s:audit` | Full codebase audit across 8 dimensions |
-| `/intel4s:critique` | Architecture evaluation (coupling, cohesion, hierarchy) |
-| `/intel4s:harden` | Add validation, timeouts, retries, error handling |
-| `/intel4s:simplify` | Remove dead code, flatten complexity, inline indirection |
-| `/intel4s:normalize` | Discover project conventions, align deviating code |
-| `/intel4s:extract` | Find duplication, extract reusable traits/utilities |
-| `/intel4s:polish` | Final pass: naming, imports, docs, consistency |
+| `/agent4s:setup` | Detect build tool, run overview, write CLAUDE.md section |
+| `/agent4s:semanticdb` | Add `-Xsemanticdb` to build config, compile, verify |
+| `/agent4s:doctor` | Check binary, index, SemanticDB, CLAUDE.md status |
+| `/agent4s:upgrade` | Upgrade binary to latest release |
+| `/agent4s:bug-hunt` | Scan → LLM triage → GitHub issues cross-ref → reproduction |
+| `/agent4s:audit` | Full codebase audit across 8 dimensions |
+| `/agent4s:critique` | Architecture evaluation (coupling, cohesion, hierarchy) |
+| `/agent4s:harden` | Add validation, timeouts, retries, error handling |
+| `/agent4s:simplify` | Remove dead code, flatten complexity, inline indirection |
+| `/agent4s:normalize` | Discover project conventions, align deviating code |
+| `/agent4s:extract` | Find duplication, extract reusable traits/utilities |
+| `/agent4s:polish` | Final pass: naming, imports, docs, consistency |
 | `scala-expert` | Agent auto-invoked for multi-step tasks (3+ commands) |
 
 ---
@@ -217,7 +217,7 @@ intel4s bug-hunt --json                            # structured output for tooli
 
 ### vs grep
 
-| Task | intel4s | grep |
+| Task | agent4s | grep |
 |---|---|---|
 | Who imports Compiler? | 1,206 files (resolves wildcard imports) | 17 files (literal match only) |
 | Inheritance tree | Complete from parsed extends clauses | Not possible |
@@ -233,7 +233,7 @@ Use grep for: string literals, config values, non-Scala files.
 1. git ls-files --stage       → tracked .scala/.java files + content hashes
 2. Compare OIDs vs cache      → skip unchanged files
 3. Scalameta parse (parallel) → AST → symbols, bloom filters, imports
-4. .intel4s/index.bin          → binary cache with string interning
+4. .scalex/index.bin          → binary cache with string interning
 5. Answer the query            → lazy indexes
 6. [Optional] SemanticDB       → .semanticdb files from compiler for type-aware mode
 ```
@@ -248,7 +248,7 @@ No build server. No daemon. Run, answer, exit.
 - **No implicit resolution.** Can't find given instances that the compiler would select.
 - **No macro expansion.** Macro-generated code is invisible.
 - **refs is text-based.** `refs Config` finds all things named Config across all packages. Use `--semantic` for type-aware disambiguation.
-- **Taint analysis is heuristic.** We trace variable names, not types. False positives exist. The LLM triage step in `/intel4s:bug-hunt` skill helps filter them.
+- **Taint analysis is heuristic.** We trace variable names, not types. False positives exist. The LLM triage step in `/agent4s:bug-hunt` skill helps filter them.
 - **call-graph without --semantic** matches method names, not resolved dispatch targets.
 
 For full semantic precision, compile with `-Xsemanticdb` and use `--semantic` flag.

@@ -8,7 +8,7 @@ fi
 set -euo pipefail
 
 EXPECTED_VERSION="0.4.0"
-REPO="haskiindahouse/intel4s"
+REPO="scala-digest/agent4s"
 
 # Expected SHA-256 checksums for each artifact (updated each release alongside EXPECTED_VERSION)
 # Will be populated after first release build
@@ -17,7 +17,7 @@ CHECKSUM_scalex_macos_x64="0dc318a9d8e8f8a5118cbac0f982edf30aabc8db8405d4bfa3970
 CHECKSUM_scalex_linux_x64="d874a01ef5b07b67e299aa22cc83c609bcd609ef3b6e25db19aa6c85fc8c09ad"
 
 # Cache location: follow XDG spec
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/intel4s"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/agent4s"
 
 # Detect platform → artifact name
 OS=$(uname -s); ARCH=$(uname -m)

@@ -1,10 +1,10 @@
 ---
 name: setup
-description: "One-time project setup for intel4s Scala code intelligence. Detects build tool, analyzes project structure, and writes a Scala Code Intelligence section to CLAUDE.md so the agent knows when and how to use scalex. Run once per project, re-run to refresh."
+description: "One-time project setup for agent4s Scala code intelligence. Detects build tool, analyzes project structure, and writes a Scala Code Intelligence section to CLAUDE.md so the agent knows when and how to use scalex. Run once per project, re-run to refresh."
 disable-model-invocation: true
 ---
 
-You are setting up intel4s for this Scala project. Follow these steps exactly.
+You are setting up agent4s for this Scala project. Follow these steps exactly.
 
 ## Step 1: Locate scalex-cli
 
@@ -60,10 +60,10 @@ Read the existing `CLAUDE.md` in the project root (if it exists).
 Generate the following section, filling in the detected values:
 
 ```markdown
-<!-- intel4s:start -->
-## Scala Code Intelligence (intel4s)
+<!-- agent4s:start -->
+## Scala Code Intelligence (agent4s)
 
-This project uses the [intel4s](https://github.com/haskiindahouse/intel4s) plugin for Scala code intelligence.
+This project uses the [agent4s](https://github.com/scala-digest/agent4s) plugin for Scala code intelligence.
 
 ### Build tool
 {detected build tool} {detected Scala version if found}
@@ -76,27 +76,27 @@ This project uses the [intel4s](https://github.com/haskiindahouse/intel4s) plugi
 - **Use grep/Grep tool** for: non-Scala files, string literals, regex patterns in comments, files not yet git-tracked
 
 ### Available skills
-- `/intel4s:scalex` — 36 commands for Scala code intelligence (always available)
-- `/intel4s:setup` — re-run this setup to refresh project info
-- `/intel4s:semanticdb` — enable SemanticDB for type-aware rename and call-graph
-- `/intel4s:upgrade` — upgrade scalex binary to latest release
-- `/intel4s:doctor` — diagnostic check: binary, SemanticDB, CLAUDE.md
+- `/agent4s:scalex` — 36 commands for Scala code intelligence (always available)
+- `/agent4s:setup` — re-run this setup to refresh project info
+- `/agent4s:semanticdb` — enable SemanticDB for type-aware rename and call-graph
+- `/agent4s:upgrade` — upgrade scalex binary to latest release
+- `/agent4s:doctor` — diagnostic check: binary, SemanticDB, CLAUDE.md
 
 ### SemanticDB status
 {If available: "Available. Use `--semantic` flag with `rename`, `call-graph`, and `refs` for type-aware precision."}
-{If not configured: "Not configured. Run `/intel4s:semanticdb` to enable type-aware rename and call-graph."}
+{If not configured: "Not configured. Run `/agent4s:semanticdb` to enable type-aware rename and call-graph."}
 
 ### Quick tips
 - For complex tasks (refactoring, impact analysis, codebase exploration), the `scala-expert` agent is invoked automatically
 - Use `explain <Type> --related` to understand a type before modifying it
 - Use `refs <Symbol> --count` before any change to gauge impact
 - Use `batch` mode when you need 3+ lookups: `echo -e "def Foo\nimpl Foo\nrefs Foo" | scalex batch`
-<!-- intel4s:end -->
+<!-- agent4s:end -->
 ```
 
 ## Step 6: Write to CLAUDE.md
 
-- If CLAUDE.md exists and contains `<!-- intel4s:start -->` through `<!-- intel4s:end -->` markers: **replace** the entire block between markers (inclusive)
+- If CLAUDE.md exists and contains `<!-- agent4s:start -->` through `<!-- agent4s:end -->` markers: **replace** the entire block between markers (inclusive)
 - If CLAUDE.md exists but has no markers: **append** the section at the end of the file
 - If CLAUDE.md does not exist: **create** it with just this section
 
@@ -106,11 +106,11 @@ Use the Edit tool for replacement or the Write tool for creation.
 
 Print a summary:
 ```
-intel4s setup complete:
+agent4s setup complete:
   Build tool: {tool} ({scala version})
   Project: {N} files, {M} symbols
   SemanticDB: {available/not configured}
   CLAUDE.md: {created/updated}
 ```
 
-If SemanticDB is not configured, suggest: "Run `/intel4s:semanticdb` to enable type-aware features."
+If SemanticDB is not configured, suggest: "Run `/agent4s:semanticdb` to enable type-aware features."

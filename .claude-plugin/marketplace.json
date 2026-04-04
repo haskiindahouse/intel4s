@@ -1,7 +1,7 @@
 {
-  "name": "intel4s-marketplace",
+  "name": "agent4s-marketplace",
   "owner": {
-    "name": "haskiindahouse"
+    "name": "scala-digest"
   },
   "metadata": {
     "description": "AI Scala agent with semantic rename, call-graph, dead code detection",
@@ -9,15 +9,15 @@
   },
   "plugins": [
     {
-      "name": "intel4s",
+      "name": "agent4s",
       "source": "./plugins/scalex",
       "description": "Code intelligence for Scala. Semantic rename, call-graph, dead code detection, scaffolding. Works without a build server — type-aware when compiled. 36 commands, MCP native.",
       "version": "0.5.0",
       "author": {
-        "name": "haskiindahouse"
+        "name": "scala-digest"
       },
-      "homepage": "https://github.com/haskiindahouse/intel4s",
-      "repository": "https://github.com/haskiindahouse/intel4s",
+      "homepage": "https://github.com/scala-digest/agent4s",
+      "repository": "https://github.com/scala-digest/agent4s",
       "license": "MIT",
       "keywords": ["scala", "code-intelligence", "ai-agent", "semantic-rename", "call-graph", "mcp"],
       "category": "code-intelligence",

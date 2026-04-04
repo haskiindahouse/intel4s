@@ -102,7 +102,7 @@ For each:
 - **Where**: Specific types/packages affected
 - **Why it matters**: How this hurts maintainability/correctness
 - **Suggestion**: Concrete next step
-- **Command**: Which intel4s skill/command to use
+- **Command**: Which agent4s skill/command to use
 
 ### Design Smells
 Patterns that aren't broken but could become problems:

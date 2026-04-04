@@ -26,12 +26,12 @@ Note the current version.
 Try `gh` first (most reliable), fall back to `curl`:
 
 ```bash
-gh release view --repo haskiindahouse/intel4s --json tagName -q .tagName 2>/dev/null
+gh release view --repo scala-digest/agent4s --json tagName -q .tagName 2>/dev/null
 ```
 
 If `gh` is not available:
 ```bash
-curl -sL "https://api.github.com/repos/haskiindahouse/intel4s/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//'
+curl -sL "https://api.github.com/repos/scala-digest/agent4s/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//'
 ```
 
 The tag format is `vX.Y.Z`. Strip the `v` prefix to compare with the current version.
@@ -76,4 +76,4 @@ scalex upgraded: vOLD → vNEW
 If the version didn't change, check:
 - Is the `EXPECTED_VERSION` in `scalex-cli` script up to date?
 - Was the download successful? Check for error messages in the output.
-- The bootstrap script pins to `EXPECTED_VERSION` — if this hasn't been bumped in the plugin, the binary won't upgrade past that version. Tell the user to update the plugin itself: `claude plugins install intel4s`
+- The bootstrap script pins to `EXPECTED_VERSION` — if this hasn't been bumped in the plugin, the binary won't upgrade past that version. Tell the user to update the plugin itself: `claude plugins install agent4s`

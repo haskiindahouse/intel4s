@@ -1,11 +1,11 @@
 {
-  "name": "intel4s",
+  "name": "agent4s",
   "version": "0.4.0",
   "description": "Code intelligence for Scala — semantic rename, call-graph, dead code detection, scaffolding. Works without a build, type-aware when compiled.",
   "author": {
-    "name": "haskiindahouse"
+    "name": "scala-digest"
   },
-  "repository": "https://github.com/haskiindahouse/intel4s",
+  "repository": "https://github.com/scala-digest/agent4s",
   "license": "MIT",
   "keywords": ["scala", "code-intelligence", "ai-agent", "semantic-rename", "call-graph", "mcp"]
 }

@@ -1,10 +1,10 @@
 ---
 name: doctor
-description: "Diagnostic check for intel4s. Verifies scalex binary works, index builds correctly, SemanticDB availability, and CLAUDE.md configuration. Run when something seems broken."
+description: "Diagnostic check for agent4s. Verifies scalex binary works, index builds correctly, SemanticDB availability, and CLAUDE.md configuration. Run when something seems broken."
 disable-model-invocation: true
 ---
 
-You are running diagnostics for intel4s in this project. Run each check and report a status summary.
+You are running diagnostics for agent4s in this project. Run each check and report a status summary.
 
 ## Locate scalex-cli
 
@@ -48,7 +48,7 @@ find "<project-root>" -name "*.semanticdb" -path "*/META-INF/*" 2>/dev/null | wc
 ```
 
 - **OK**: N files found → SemanticDB available, `--semantic` flag works
-- **NOT CONFIGURED**: 0 files → suggest running `/intel4s:semanticdb`
+- **NOT CONFIGURED**: 0 files → suggest running `/agent4s:semanticdb`
 
 If OK, also verify scalex can load them:
 ```bash
@@ -58,10 +58,10 @@ Check if it says "Using semantic rename (N compiled files)" or "No SemanticDB da
 
 ## Check 4: CLAUDE.md
 
-Read the project's CLAUDE.md and check for `<!-- intel4s:start -->` marker.
+Read the project's CLAUDE.md and check for `<!-- agent4s:start -->` marker.
 
-- **OK**: marker found → intel4s section is configured
-- **NOT CONFIGURED**: no marker or no CLAUDE.md → suggest running `/intel4s:setup`
+- **OK**: marker found → agent4s section is configured
+- **NOT CONFIGURED**: no marker or no CLAUDE.md → suggest running `/agent4s:setup`
 
 If OK, also check if the section content is stale:
 - Does the build tool still match?
@@ -83,14 +83,14 @@ xattr -l ~/.cache/scalex/* 2>/dev/null | grep -c quarantine
 Print a status table:
 
 ```
-intel4s doctor:
+agent4s doctor:
   Binary:     {OK vX.Y.Z | FAIL: reason}
   Index:      {OK (N files, M symbols) | FAIL: reason}
-  SemanticDB: {OK (N files) | Not configured — run /intel4s:semanticdb}
-  CLAUDE.md:  {OK | Not configured — run /intel4s:setup}
+  SemanticDB: {OK (N files) | Not configured — run /agent4s:semanticdb}
+  CLAUDE.md:  {OK | Not configured — run /agent4s:setup}
   Quarantine: {OK | WARNING: run xattr -d ...}
 ```
 
-If everything is OK, print: "All checks passed. intel4s is ready."
+If everything is OK, print: "All checks passed. agent4s is ready."
 
 If any check failed, print the specific fix for each failure. Prioritize: Binary > Index > SemanticDB > CLAUDE.md > Quarantine.

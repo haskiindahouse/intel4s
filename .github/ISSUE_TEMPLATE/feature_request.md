@@ -14,4 +14,4 @@ How do you solve this today? (grep, manual, IDE, etc.)
 What command/flag would solve this?
 
 **Is this better than grep?**
-intel4s only adds features that grep fundamentally cannot do. Would this feature pass that bar?
+agent4s only adds features that grep fundamentally cannot do. Would this feature pass that bar?

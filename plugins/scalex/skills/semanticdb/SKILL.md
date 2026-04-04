@@ -4,7 +4,7 @@ description: "Enable SemanticDB for type-aware Scala code intelligence. Detects 
 disable-model-invocation: true
 ---
 
-You are enabling SemanticDB for this Scala project so that intel4s can use type-aware features (`--semantic` flag for `rename`, `call-graph`, `refs`).
+You are enabling SemanticDB for this Scala project so that agent4s can use type-aware features (`--semantic` flag for `rename`, `call-graph`, `refs`).
 
 ## Step 1: Check current state
 
@@ -133,7 +133,7 @@ If files found, SemanticDB is working. If not, check:
 
 ## Step 8: Update CLAUDE.md
 
-If the project has a CLAUDE.md with `<!-- intel4s:start -->` markers (from `/intel4s:setup`), update the SemanticDB status line:
+If the project has a CLAUDE.md with `<!-- agent4s:start -->` markers (from `/agent4s:setup`), update the SemanticDB status line:
 
 Find the line that says "Not configured" and replace it with:
 ```

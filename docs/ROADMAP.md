@@ -28,7 +28,7 @@
 - [x] `--severity` and `--bug-category` filters
 - [x] `--hotspots` — complexity × git churn ranking (single git call for all files)
 - [x] JSON output for skill consumption
-- [x] `/intel4s:bug-hunt` skill — LLM triage, GitHub issues cross-reference, reproduction generation
+- [x] `/agent4s:bug-hunt` skill — LLM triage, GitHub issues cross-reference, reproduction generation
 - [ ] Reduce false positives: ZIO `Ref.get` vs `Option.get`, tapir endpoint builder `.get`
 - [ ] Tier 2 patterns: unhandled Future failures, non-exhaustive match, fiber leaks
 - [ ] Dependency vulnerability scanning (parse build files, compare CVE database)
