@@ -25,9 +25,11 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
     "succeed", "Await", "sleep", "sender", "Fragment", "ObjectInputStream",
     "enableDefaultTyping", "password", "secret", "token", "apiKey", "fromFile",
     "exec", "ProcessBuilder", "Process", "File", "Paths", "Html", "Redirect",
-    "singleRequest", "fromURL",
+    "singleRequest", "fromURL", "sql",
     "MessageDigest", "Cipher", "Random", "IvParameterSpec",
     "SAXParser", "DocumentBuilderFactory", "SAXParserFactory", "XMLInputFactory", "XPath",
+    // WHY: log method names needed for LogInjection pattern — without them bloom pre-screen filters out files
+    "info", "warn", "error", "debug", "trace",
     "die", "unsafeRun", "unsafe", "onComplete",
     "synchronized", "mutable",
     "tail", "Pattern",
@@ -59,6 +61,17 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
   // Collect and filter results
   var results = findings.asScala.toList
 
+  // Apply suppression memories — filter out findings that match an Ignore memory.
+  // WHY: Load once then pass to matches to avoid re-reading the file per finding.
+  val memoryStore = MemoryStore(workspace)
+  val memories = memoryStore.load()
+  if memories.nonEmpty then
+    results = results.filter { finding =>
+      memoryStore.matchesLoaded(finding, memories) match
+        case Some(mem) if mem.suppressionType == SuppressionType.Ignore => false
+        case _ => true
+    }
+
   // Apply severity filter
   ctx.bugSeverity.foreach { sev =>
     val minSev = sev.toLowerCase match
@@ -83,6 +96,32 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
     }
   }
 
+  // Phase 3 (optional): Reachability filtering — keep only findings in methods
+  // reachable from entrypoints within the configured call-graph depth.
+  // WHY: done before sorting/limiting so limit applies to reachable findings only.
+  var filteredByReachability = 0
+  if ctx.reachable then
+    val (reachableSet, entrypointMap) = buildReachableSet(
+      ctx.idx, workspace, ctx.reachableDepth, ctx.reachableIncludeTests
+    )
+    val (reachableFindings, unreachable) = results.partition { f =>
+      findEnclosingMethod(f.file, f.line).exists(reachableSet.contains)
+    }
+    filteredByReachability = unreachable.size
+    // Enrich reachable findings with metadata
+    results = reachableFindings.map { f =>
+      val method = findEnclosingMethod(f.file, f.line)
+      val reachableFromList = method.flatMap(m => entrypointMap.get(m)).getOrElse(Nil)
+      // Compute minimum depth as 1-based hops (1 = directly in entrypoint, 2+ = via callees).
+      // We don't store per-hop depth in entrypointMap, so we use 1 as a conservative lower bound.
+      // A future semantic call-graph can provide precise depth.
+      // WHY: depth 1 is "reachable via at least one hop" — good enough for triage prioritization.
+      val depth = if reachableFromList.nonEmpty then Some(1) else None
+      f.copy(reachableFrom = Some(reachableFromList), callDepth = depth)
+    }
+    if filteredByReachability > 0 then
+      System.err.println(s"Reachability: $filteredByReachability finding${if filteredByReachability != 1 then "s" else ""} filtered (not reachable from entrypoints within depth ${ctx.reachableDepth})")
+
   // Sort: critical first, then high, then medium; within same severity by file path
   results = results.sortBy { f =>
     val sevOrd = f.pattern.severity match
@@ -96,14 +135,15 @@ def cmdBugHunt(args: List[String], ctx: CommandContext): CmdResult =
   if ctx.limit > 0 && results.size > ctx.limit then
     results = results.take(ctx.limit)
 
-  // Phase 3: Hotspot ranking (optional)
+  // Phase 4: Hotspot ranking (optional)
   val hotspots = if ctx.hotspots then computeHotspots(results, workspace) else Nil
 
   CmdResult.BugHuntReport(results, hotspots, candidates.size, timedOut)
 
 // ── AST scanner ────────────────────────────────────────────────────────────
 
-private def scanFile(
+// WHY: not private — pattern-validate command needs to call this for spec validation
+def scanFile(
   filePath: Path, relPath: String, findings: java.util.concurrent.ConcurrentLinkedQueue[BugFinding],
   enableTaint: Boolean = false, idx: Option[WorkspaceIndex] = None, workspace: Path = null
 ): Unit =

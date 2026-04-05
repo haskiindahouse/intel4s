@@ -6,7 +6,7 @@ labels: bug
 
 **Command**
 ```bash
-intel4s <command> <args>
+agent4s <command> <args>
 ```
 
 **Expected behavior**
@@ -14,7 +14,7 @@ intel4s <command> <args>
 **Actual behavior**
 
 **Environment**
-- intel4s version: `intel4s --version`
+- agent4s version: `agent4s --version`
 - OS:
 - Scala version:
 - Build tool (sbt/Mill/scala-cli):

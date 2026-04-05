@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>intel4s — Code Intelligence for Scala</title>
+    <title>agent4s — Code Intelligence for Scala</title>
 
-    <meta name="description" content="Code intelligence for Scala. Works without a build. Gets smarter when you compile." />
-    <meta property="og:title" content="intel4s — Code Intelligence for Scala" />
-    <meta property="og:description" content="Semantic rename, call-graph, dead code detection. No build server needed — type-aware when compiled." />
+    <meta name="description" content="Scala superpowers for AI coding agents. 37 commands for code navigation, refactoring, dead code detection, and bug hunting. No build server needed." />
+    <meta property="og:title" content="agent4s — Scala Superpowers for AI Agents" />
+    <meta property="og:description" content="37 commands. 349ms. Dead code detection, bug hunting, semantic rename, call-graph. Works in Claude Code, Cursor, Windsurf, Cline." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="intel4s — Code Intelligence for Scala" />
-    <meta name="twitter:description" content="Works without a build. Gets smarter when you compile." />
+    <meta name="twitter:title" content="agent4s — Scala Superpowers for AI Agents" />
+    <meta name="twitter:description" content="Your AI agent treats Scala like plain text. agent4s gives it 37 commands to understand your codebase in 349ms." />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -146,11 +146,11 @@
     <!-- ======= SLIDE 1: TITLE ======= -->
     <section class="slide title-slide" data-slide="0">
       <div class="slide-content">
-        <img src="vulture.png" alt="intel4s" width="200" class="reveal" style="filter: drop-shadow(0 0 30px var(--accent-glow));">
-        <h1 class="reveal">intel<span class="accent">4s</span></h1>
+        <img src="vulture.png" alt="agent4s" width="200" class="reveal" style="filter: drop-shadow(0 0 30px var(--accent-glow));">
+        <h1 class="reveal">agent<span class="accent">4s</span></h1>
         <p class="title-tagline reveal">
-          Code intelligence for Scala.<br>
-          <strong>Works without a build. Gets smarter when you compile.</strong>
+          Scala superpowers for AI coding agents.<br>
+          <strong>From git clone to code understanding in 349ms.</strong>
         </p>
         <div class="stat-row reveal">
           <div class="stat-item"><div class="stat-value">37</div><div class="stat-label">Commands</div></div>
@@ -198,7 +198,7 @@
         <p class="subtitle reveal">Text-based by default. Type-aware when compiled. One flag: <span class="mono accent">--semantic</span>.</p>
         <div class="compare reveal">
           <div class="terminal compare-bad">
-            <pre><span class="t-dim">$ intel4s rename Config AppConfig</span>
+            <pre><span class="t-dim">$ agent4s rename Config AppConfig</span>
 
 <span class="t-red">6 edits in 3 files</span>  ← hits BOTH packages
 
@@ -208,7 +208,7 @@
     <span class="t-red">Config → AppConfig</span>   ✗ WRONG package!</pre>
           </div>
           <div class="terminal compare-good">
-            <pre><span class="t-dim">$ intel4s rename Config AppConfig <span class="t-accent">--semantic</span></span>
+            <pre><span class="t-dim">$ agent4s rename Config AppConfig <span class="t-accent">--semantic</span></span>
 
 <span class="t-green">2 edits in 1 file</span>   ← only app.Config
 
@@ -265,7 +265,7 @@
         <h2 class="reveal">See the <span class="accent">flow</span>.</h2>
         <p class="subtitle reveal">One command. Both directions.</p>
         <div class="terminal reveal">
-          <pre><span class="t-dim">$ intel4s call-graph processPayment --in PaymentService --semantic</span>
+          <pre><span class="t-dim">$ agent4s call-graph processPayment --in PaymentService --semantic</span>
 
 Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/Payment.scala:15)
 
@@ -329,7 +329,7 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
         <div class="card-grid reveal" style="margin-top: var(--content-gap)">
           <div class="card">
             <h3><span class="accent">1,206</span> <span style="color:var(--text-dim)">vs 17</span></h3>
-            <p>Importers found for <span class="mono">Compiler</span>. intel4s resolves wildcard imports. grep misses 98.6%.</p>
+            <p>Importers found for <span class="mono">Compiler</span>. agent4s resolves wildcard imports. grep misses 98.6%.</p>
           </div>
           <div class="card">
             <h3><span class="accent">283</span> refs, <span class="green">categorized</span></h3>
@@ -354,9 +354,9 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
 
 {
   "<span class="t-accent">mcpServers</span>": {
-    "<span class="t-green">intel4s</span>": {
+    "<span class="t-green">agent4s</span>": {
       "type": "stdio",
-      "command": "/path/to/intel4s",
+      "command": "/path/to/agent4s",
       "args": ["mcp"]
     }
   }
@@ -365,10 +365,10 @@ Call graph for <span class="t-accent">PaymentService.processPayment</span> (src/
           <div class="terminal">
             <pre><span class="t-dim">Claude Code</span>
 
-<span class="t-accent">$</span> /plugin install intel4s
-<span class="t-accent">$</span> /intel4s:setup
+<span class="t-accent">$</span> /plugin install agent4s
+<span class="t-accent">$</span> /agent4s:setup
 
-<span class="t-green">intel4s setup complete:</span>
+<span class="t-green">agent4s setup complete:</span>
   Build tool: <span class="t-accent">sbt</span> (Scala 3.3.3)
   Project:    <span class="t-accent">228</span> files, <span class="t-accent">1791</span> symbols
   CLAUDE.md:  <span class="t-green">created</span>
@@ -383,14 +383,14 @@ Agent:  scala-expert (auto-invoked)</span></pre>
     <!-- ======= SLIDE 9: CLOSING ======= -->
     <section class="slide closing-slide" data-slide="8">
       <div class="slide-content">
-        <h1 class="reveal">intel<span class="accent">4s</span></h1>
+        <h1 class="reveal">agent<span class="accent">4s</span></h1>
         <p class="title-tagline reveal">
-          Works without a build.<br>
-          <strong>Gets smarter when you compile.</strong>
+          Your AI agent's Scala brain.<br>
+          <strong>37 commands. 349ms. Zero build setup.</strong>
         </p>
         <div class="cta-row reveal">
-          <a href="https://github.com/YOUR_USERNAME/intel4s" class="cta cta-primary">GitHub →</a>
-          <a href="https://github.com/YOUR_USERNAME/intel4s/releases" class="cta cta-secondary">Releases</a>
+          <a href="https://github.com/scala-digest/agent4s" class="cta cta-primary">GitHub →</a>
+          <a href="https://github.com/scala-digest/agent4s/releases" class="cta cta-secondary">Releases</a>
         </div>
       </div>
     </section>

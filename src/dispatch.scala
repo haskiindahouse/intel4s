@@ -18,6 +18,8 @@ val commands: Map[String, (List[String], CommandContext) => CmdResult] = Map(
   "unused" -> cmdUnused,
   "call-graph" -> cmdCallGraph,
   "bug-hunt" -> cmdBugHunt,
+  "memory" -> cmdMemory,
+  "pattern" -> cmdPattern,
 )
 
 def runCommand(cmd: String, args: List[String], ctx: CommandContext): Unit =
