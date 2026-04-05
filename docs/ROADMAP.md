@@ -2,18 +2,30 @@
 
 ## Strategic Vision
 
-**Goal:** Every Scala project uses agent4s — the standard code intelligence layer for AI agents working with Scala.
+**Goal:** Every AI agent working with Scala uses agent4s. The standard way to give AI coding tools Scala superpowers.
 
-**Positioning:** The only build-free Scala code intelligence tool for AI agents. Metals requires compilation; grep has no structure; agent4s gives instant structured answers from `git clone` to first query in <1 second.
+**Category:** AI agent tooling for Scala (no direct competitor in this category).
 
-**Addressable market:** ~500K Scala developers, $146K avg salary, concentrated in finance, data engineering, big tech. "Tooling" is #1 pain point in Scala community surveys. 92% of developers use AI coding tools daily.
+**Positioning:** Your AI agent treats Scala like plain text. grep finds 50 things named `Config`. agent4s finds the one you mean. 37 commands for code navigation, refactoring, dead code detection, and bug hunting — from `git clone` to first answer in 349ms.
 
-**Competitive moat:**
-- Zero-setup (no build server, no compilation, no classpath)
+**Primary audience:**
+- Scala developers using AI coding tools (Claude Code, Cursor, Windsurf, Cline)
+- Team leads in fintech/data engineering with large Scala codebases
+- AI-first developers building agentic workflows with MCP
+
+**Why people choose agent4s:**
+- Zero-setup: no build server, no compilation — instant from `git clone`
 - 349ms warm index on 18.5K files (Metals needs minutes for initial build)
-- 45 Scala-specific bug patterns (ZIO, Cats Effect, concurrency) — no competitor has this
-- Dual delivery: Claude Code plugin + MCP server (Cursor, Windsurf, Cline)
+- 45 Scala-specific bug patterns with taint analysis — no competitor has this without compilation
+- Dual delivery: Claude Code plugin + MCP server covers every major AI coding tool
 - Offline, local, private — code never leaves the machine
+- Hybrid: text-based by default, type-aware with `--semantic` when compiled
+
+**Entry points for discovery:**
+- Claude Code marketplace: "Scala plugin"
+- MCP server listings: "Scala MCP"
+- Community: r/scala, Scala Discord, X/Twitter demo threads
+- Security angle: "Static analysis for Scala without a build server" (bug-hunt as standalone value prop)
 
 ---
 
@@ -22,12 +34,12 @@
 *Goal: Get discovered. First 1,000 installs.*
 
 - [ ] **Publish to Claude Code marketplace** — #1 blocker for adoption. Only 834 plugins total; first-mover advantage for Scala
-- [ ] **MCP quick-start templates** — copy-paste configs for Cursor, Windsurf, Cline, OpenCode in README and site
-- [ ] **Windows native image** — expand platform coverage from macOS+Linux to include Windows x64 (GraalVM)
+- [x] **MCP quick-start templates** — copy-paste configs for Cursor, Windsurf, Cline in README
+- [x] **Windows native image** — expand platform coverage from macOS+Linux to include Windows x64 (GraalVM)
 - [ ] **Landing page SEO** — update `docs/site/index.html` with meta tags, structured data, "Scala AI tool" keywords
 - [ ] **Scala community launch** — post on Scala Contributors, r/scala, Scala Discord, X/Twitter. Demo: "from git clone to finding dead code in 5 seconds"
-- [ ] **Homebrew formula** — `brew install scala-digest/tap/agent4s` for macOS
-- [ ] **GitHub Action** — `scala-digest/agent4s-action@v1` for CI pipelines (unused code check, bug-hunt on PRs)
+- [x] **Homebrew formula** — `brew install scala-digest/tap/agent4s` for macOS/Linux
+- [x] **GitHub Action** — `scala-digest/agent4s-action@v1` for CI pipelines (unused code check, bug-hunt on PRs)
 
 ## Phase 2: Zero Friction (Q3 2026)
 

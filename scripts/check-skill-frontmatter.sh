@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-SKILL_FILE="${1:-plugins/scalex/skills/scalex/SKILL.md}"
+SKILL_FILE="${1:-plugins/agent4s/skills/agent4s/SKILL.md}"
 MAX_DESC_LEN=1024
 
 if [[ ! -f "$SKILL_FILE" ]]; then

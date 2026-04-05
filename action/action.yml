@@ -1,0 +1,120 @@
+name: 'agent4s'
+description: 'Scala code intelligence for CI — bug-hunt, unused code detection, and more'
+branding:
+  icon: 'shield'
+  color: 'orange'
+
+inputs:
+  version:
+    description: 'agent4s version to use (e.g. "0.5.0"). Defaults to latest.'
+    required: false
+    default: 'latest'
+  command:
+    description: 'Command to run: "bug-hunt", "unused", or a custom command string'
+    required: true
+  args:
+    description: 'Additional arguments passed to agent4s (e.g. "--severity critical --no-tests")'
+    required: false
+    default: ''
+  workspace:
+    description: 'Path to the Scala project (defaults to repository root)'
+    required: false
+    default: '.'
+  fail-on-findings:
+    description: 'Fail the step if findings are reported (true/false)'
+    required: false
+    default: 'true'
+
+outputs:
+  findings-count:
+    description: 'Number of findings reported'
+    value: ${{ steps.run.outputs.findings_count }}
+  report:
+    description: 'Full text output from agent4s'
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64)   echo "artifact=scalex-linux-x64" >> "$GITHUB_OUTPUT" ;;
+          macOS-ARM64)  echo "artifact=scalex-macos-arm64" >> "$GITHUB_OUTPUT" ;;
+          macOS-X64)    echo "artifact=scalex-macos-x64" >> "$GITHUB_OUTPUT" ;;
+          Windows-X64)  echo "artifact=scalex-windows-x64.exe" >> "$GITHUB_OUTPUT" ;;
+          *) echo "::error::Unsupported platform: ${{ runner.os }}-${{ runner.arch }}" && exit 1 ;;
+        esac
+
+    - name: Resolve version
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          TAG=$(gh release view --repo scala-digest/agent4s --json tagName -q '.tagName')
+        else
+          TAG="v${{ inputs.version }}"
+        fi
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Download agent4s
+      shell: bash
+      run: |
+        gh release download "${{ steps.version.outputs.tag }}" \
+          --repo scala-digest/agent4s \
+          --pattern "${{ steps.platform.outputs.artifact }}" \
+          --output agent4s-bin
+        chmod +x agent4s-bin
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Run agent4s
+      id: run
+      shell: bash
+      run: |
+        set +e
+        OUTPUT=$(./agent4s-bin ${{ inputs.command }} -w "${{ inputs.workspace }}" ${{ inputs.args }} 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "$OUTPUT"
+
+        # Count findings (lines starting with a file path pattern or containing severity markers)
+        COUNT=$(echo "$OUTPUT" | grep -cE '^\s*(CRITICAL|HIGH|MEDIUM|LOW|WARNING|ERROR)|^[a-zA-Z].*\.scala:' || echo "0")
+        echo "findings_count=$COUNT" >> "$GITHUB_OUTPUT"
+
+        # Store report (truncate for output limits)
+        {
+          echo "report<<AGENT4S_EOF"
+          echo "$OUTPUT" | head -500
+          echo "AGENT4S_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+        # Post as job summary
+        {
+          echo "## agent4s: \`${{ inputs.command }}\`"
+          echo ""
+          echo "| Metric | Value |"
+          echo "|--------|-------|"
+          echo "| Command | \`agent4s ${{ inputs.command }} ${{ inputs.args }}\` |"
+          echo "| Workspace | \`${{ inputs.workspace }}\` |"
+          echo "| Findings | $COUNT |"
+          echo ""
+          echo '<details><summary>Full output</summary>'
+          echo ""
+          echo '```'
+          echo "$OUTPUT" | head -500
+          echo '```'
+          echo '</details>'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ inputs.fail-on-findings }}" = "true" ] && [ "$COUNT" -gt 0 ]; then
+          echo "::error::agent4s found $COUNT issue(s)"
+          exit 1
+        fi
+
+        exit 0

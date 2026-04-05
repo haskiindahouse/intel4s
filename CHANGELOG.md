@@ -6,6 +6,12 @@ All notable changes to agent4s are documented here.
 
 ### Added
 
+- **`/agent4s:submit` feedback skill** — structured community feedback loop. Users report false positives, missing patterns, empty results, wrong results, performance issues, or feature requests. Anonymized metadata only (version, file count, symbol count — no source code or file paths). Submits via `gh issue create` to the agent4s repo with structured labels, or falls back to formatted markdown for manual submission
+- **Homebrew formula** — `brew install scala-digest/tap/agent4s` for macOS (arm64/x64) and Linux (x64). Includes `scripts/update-homebrew.sh` for release automation
+- **MCP quick-start templates** — copy-paste configs for Cursor, Windsurf, Cline, and generic MCP clients in README
+- **Feedback triage workflow** — GitHub Actions bot runs weekly, aggregates `/submit` reports by pattern. When 3+ users report the same issue → auto-creates `[pattern-review]` meta-issue. When meta-issue is closed → bot comments on all linked reports and closes them ("your feedback improved agent4s")
+- **GitHub Action** — `scala-digest/agent4s-action@v1` composite action for CI. Runs bug-hunt, unused, or any agent4s command on PRs. Auto-downloads binary, posts results to Job Summary, supports fail-on-findings gate
+- **Windows x64 native image** — GraalVM native image for Windows added to release workflow. 4 platforms: macOS arm64, macOS x64, Linux x64, Windows x64
 - **Regex-based credential detection** in `bug-hunt` — 16 high-confidence patterns (AWS access tokens, GitHub PATs, Anthropic/OpenAI API keys, private keys, Slack tokens, Stripe keys, GitLab PATs, npm/PyPI tokens, etc.) scanned against string literal values. Complements existing variable-name detection (`HardcodedSecret`). Ported from gitleaks rules via Claude Code's secretScanner
 - **Structured MCP error responses** — `_meta.errorCategory` field in tool results for programmatic error handling. Categories: `not_found`, `usage_error`, `timeout`, `parse_error`, `internal_error`. MCP clients can now distinguish error types without parsing message strings
 - **Rename dry-run mode** — `rename` now shows a preview by default. Pass `--apply` to write changes to disk. Includes file staleness protection: compares expected line content against current disk state before writing, skips files modified since indexing (TOCTOU protection)

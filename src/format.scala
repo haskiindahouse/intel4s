@@ -119,6 +119,8 @@ def render(result: CmdResult, ctx: CommandContext): Unit = {
     case r: ScaffoldImpl     => renderScaffoldImpl(r, ctx)
     case r: ScaffoldTest     => renderScaffoldTest(r, ctx)
     case r: BugHuntReport    => renderBugHuntReport(r, ctx)
+    case r: MemoryResult     => renderMemoryResult(r, ctx)
+    case r: PatternValidation => renderPatternValidation(r, ctx)
     case r: NotFound         => renderNotFound(r, ctx)
     case r: UsageError       => println(r.message)
   }
@@ -1530,7 +1532,12 @@ private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext)
           val stepsJson = flow.steps.map(s => s"""{"var":"${jsonEscape(s.varName)}","line":${s.line},"op":"${jsonEscape(s.operation)}"}""").mkString("[", ",", "]")
           s""","taint":{"source":"${jsonEscape(flow.source.name)}","sourceType":"${jsonEscape(flow.source.description)}","sourceLine":${flow.source.line},"steps":$stepsJson,"confidence":${flow.confidence}}"""
         case None => ""
-      s"""{"file":"$rel","line":${f.line},"pattern":"${f.pattern.toString}","severity":"${f.pattern.severity.toString.toLowerCase}","category":"${f.pattern.category.toString.toLowerCase}","message":"${jsonEscape(f.message)}","contextLine":"${jsonEscape(f.contextLine)}","enclosingSymbol":"${jsonEscape(f.enclosingSymbol)}"$taintJson}"""
+      val reachJson = f.reachableFrom match
+        case Some(eps) if eps.nonEmpty =>
+          val depthStr = f.callDepth.map(d => s""","callDepth":$d""").getOrElse("")
+          s""","reachableFrom":[${eps.map(e => s"\"${jsonEscape(e)}\"").mkString(",")}]$depthStr"""
+        case _ => ""
+      s"""{"file":"$rel","line":${f.line},"pattern":"${f.pattern.toString}","severity":"${f.pattern.severity.toString.toLowerCase}","category":"${f.pattern.category.toString.toLowerCase}","message":"${jsonEscape(f.message)}","contextLine":"${jsonEscape(f.contextLine)}","enclosingSymbol":"${jsonEscape(f.enclosingSymbol)}"$taintJson$reachJson}"""
     }.mkString("[", ",", "]")
     val hotspotsJson = r.hotspots.map { h =>
       s"""{"file":"${jsonEscape(h.file)}","findingCount":${h.findingCount},"churnScore":${h.churnScore},"complexityScore":${h.complexityScore},"riskScore":${h.riskScore}}"""
@@ -1554,6 +1561,11 @@ private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext)
           val chain = (flow.source.name :: flow.steps.map(s => s"${s.varName}")).mkString(" → ")
           println(s"    Flow: $chain")
         }
+        f.reachableFrom.foreach { eps =>
+          if eps.nonEmpty then
+            val depthStr = f.callDepth.map(d => s" (depth: $d)").getOrElse("")
+            println(s"    Reachable from: ${eps.mkString(", ")}$depthStr")
+        }
         println()
       }
     }
@@ -1565,6 +1577,57 @@ private def renderBugHuntReport(r: CmdResult.BugHuntReport, ctx: CommandContext)
       println()
     }
   }
+}
+
+private def renderMemoryResult(r: CmdResult.MemoryResult, ctx: CommandContext): Unit = {
+  if r.message.nonEmpty then println(r.message)
+  // export subcommand prints raw JSONL directly — nothing to render here
+  if r.memories.isEmpty then {
+    if r.message.isEmpty then println("No suppression memories.")
+  } else if ctx.jsonOutput then {
+    val arr = r.memories.zipWithIndex.map { (m, i) =>
+      val scopeJson = m.scope match
+        case MemoryScope.Global(p) =>
+          s"""{"type":"global","patternName":"${jsonEscape(p)}"}"""
+        case MemoryScope.FileScoped(p, fp) =>
+          s"""{"type":"file","patternName":"${jsonEscape(p)}","filePattern":"${jsonEscape(fp)}"}"""
+        case MemoryScope.MethodScoped(p, fp, mn) =>
+          s"""{"type":"method","patternName":"${jsonEscape(p)}","filePattern":"${jsonEscape(fp)}","methodName":"${jsonEscape(mn)}"}"""
+      s"""{"index":$i,"patternName":"${jsonEscape(m.patternName)}","scope":$scopeJson,"reason":"${jsonEscape(m.reason)}","suppressionType":"${m.suppressionType.toString.toLowerCase}","contextLine":"${jsonEscape(m.contextLine)}","createdAt":${m.createdAt}}"""
+    }.mkString("[", ",", "]")
+    println(arr)
+  } else {
+    val header = s"Suppression memories (${r.memories.size}):"
+    println(header)
+    r.memories.zipWithIndex.foreach { (m, i) =>
+      val scopeLabel = m.scope match
+        case MemoryScope.Global(_)              => "global"
+        case MemoryScope.FileScoped(_, fp)      => s"file:$fp"
+        case MemoryScope.MethodScoped(_, fp, mn) => s"method:$mn in $fp"
+      val typeLabel = m.suppressionType.toString.toLowerCase
+      println(s"  [$i] ${m.patternName} ($typeLabel, $scopeLabel)")
+      if m.reason.nonEmpty then println(s"      reason: ${m.reason}")
+    }
+  }
+}
+
+private def renderPatternValidation(r: CmdResult.PatternValidation, ctx: CommandContext): Unit = {
+  if ctx.jsonOutput then
+    val arr = r.results.map { v =>
+      val sup = v.suppressedPass.map(b => s""""suppressedPass":$b,""").getOrElse("")
+      val errs = v.errors.map(e => s""""${jsonEscape(e)}"""").mkString("[", ",", "]")
+      s"""{"patternName":"${jsonEscape(v.patternName)}","positivePass":${v.positivePass},"negativePass":${v.negativePass},${sup}"errors":$errs}"""
+    }.mkString("[", ",", "]")
+    println(arr)
+  else
+    val allPass = r.results.forall(v => v.positivePass && v.negativePass && v.suppressedPass.forall(identity))
+    r.results.foreach { v =>
+      val status = if v.positivePass && v.negativePass && v.suppressedPass.forall(identity) then "PASS" else "FAIL"
+      println(s"$status  ${v.patternName}")
+      if v.errors.nonEmpty then v.errors.foreach(e => println(s"  - $e"))
+    }
+    val passCount = r.results.count(v => v.positivePass && v.negativePass && v.suppressedPass.forall(identity))
+    println(s"\n${passCount}/${r.results.size} pattern specs passed.")
 }
 
 private def renderNotFound(r: CmdResult.NotFound, ctx: CommandContext): Unit = {

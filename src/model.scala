@@ -206,7 +206,9 @@ case class BugFinding(
   contextLine: String,
   enclosingSymbol: String,
   message: String,
-  taintFlow: Option[TaintFlow] = None
+  taintFlow: Option[TaintFlow] = None,
+  reachableFrom: Option[List[String]] = None,
+  callDepth: Option[Int] = None
 )
 
 case class TaintSource(name: String, description: String, file: Path, line: Int)
@@ -220,6 +222,31 @@ case class HotspotInfo(
   complexityScore: Int,
   riskScore: Double
 )
+
+// ── Suppression memories ──────────────────────────────────────────────────
+
+case class SuppressionMemory(
+  patternName: String,
+  scope: MemoryScope,
+  reason: String,
+  source: MemorySource,
+  suppressionType: SuppressionType,
+  contextLine: String,
+  createdAt: Long
+)
+
+enum MemoryScope:
+  case Global(patternName: String)
+  case FileScoped(patternName: String, filePattern: String)
+  case MethodScoped(patternName: String, filePattern: String, methodName: String)
+
+enum MemorySource:
+  case LlmTriage(skillRun: String)
+  case UserManual
+  case CommunitySubmit(issueNumber: Int)
+
+enum SuppressionType:
+  case Ignore, Lower, Review
 
 // ── Command context ────────────────────────────────────────────────────────
 
@@ -262,6 +289,9 @@ case class CommandContext(
   hotspots: Boolean = false,
   noTaint: Boolean = false,
   applyEdits: Boolean = false,
+  reachable: Boolean = false,
+  reachableDepth: Int = 5,
+  reachableIncludeTests: Boolean = false,
 ):
   val fmt: (SymbolInfo, Path) => String = if verbose then formatSymbolVerbose else formatSymbol
   val jRef: Reference => String =
@@ -340,5 +370,7 @@ enum CmdResult:
   case ScaffoldImpl(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, unimplemented: List[(parentName: String, parentFile: Path, parentLine: Int, members: List[MemberInfo])])
   case ScaffoldTest(targetName: String, targetFile: Path, targetLine: Int, targetPackage: String, publicMembers: List[MemberInfo], framework: String)
   case BugHuntReport(findings: List[BugFinding], hotspots: List[HotspotInfo], filesScanned: Int, timedOut: Boolean)
+  case MemoryResult(memories: List[SuppressionMemory], message: String = "")
+  case PatternValidation(results: List[PatternValidationResult])
   case NotFound(message: String, hint: NotFoundHint)
   case UsageError(message: String)

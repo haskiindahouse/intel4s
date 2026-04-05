@@ -1,53 +1,61 @@
-# AI Quality Gates — blocks merge on compilation warnings, test failures, or leaked secrets.
-# See docs/adr/ for architectural decisions and CLAUDE.md for invariants.
 name: AI Quality Gates
 
 on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
 jobs:
   quality:
     runs-on: ubuntu-24.04
-
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - uses: graalvm/setup-graalvm@03e8abf916fd0e281b2efe7b2da3378bb0a1d085 # v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: VirtusLab/scala-cli-setup@59e308800210b0414d2d7190068c80021e1b3e5d # v1
         with:
           power: true
-          jvm: 21
+          jvm: graalvm-java21
 
-      - name: Compile (zero warnings)
+      # === COMPILE (zero warnings) ===
+      - name: Compile
         run: |
           OUTPUT=$(scala-cli compile src/ 2>&1)
           echo "$OUTPUT"
           if echo "$OUTPUT" | grep -qi warn; then
-            echo "::error::Compilation produced warnings. Zero warnings policy — see CLAUDE.md."
+            echo "::error::Compilation warnings detected"
             exit 1
           fi
 
-      - name: Compile (zero deprecations)
+      # === DEPRECATIONS ===
+      - name: Check deprecations
         run: |
           OUTPUT=$(scala-cli compile --scalac-option "-deprecation" src/ 2>&1)
           echo "$OUTPUT"
           if echo "$OUTPUT" | grep -qi warn; then
-            echo "::error::Deprecated API usage detected. Zero deprecations policy — see CLAUDE.md."
+            echo "::error::Deprecation warnings detected"
             exit 1
           fi
 
-      - name: Configure git for tests
-        run: |
-          git config --global user.name "CI"
-          git config --global user.email "ci@test"
-
-      - name: Run all tests
+      # === TESTS ===
+      - name: Tests
         run: scala-cli test src/ tests/
 
+      # === DEPENDENCY CHANGE ALERT ===
+      - name: Dependency change alert
+        run: |
+          if git diff origin/main --name-only | grep -qE "^src/project\.scala$"; then
+            echo "::warning::Dependency change detected in src/project.scala — requires manual review (Invariant #2)"
+          fi
+
+      # === SECRETS SCAN ===
       - name: Secrets scan
-        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

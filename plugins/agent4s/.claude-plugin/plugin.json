@@ -1,0 +1,12 @@
+{
+  "name": "agent4s",
+  "version": "0.5.0",
+  "description": "Scala superpowers for AI agents. 37 commands: search, rename, dead code, bug hunting with taint analysis, call-graph, scaffolding. 349ms on 18K files. No build server.",
+  "author": {
+    "name": "scala-digest"
+  },
+  "homepage": "https://github.com/scala-digest/agent4s",
+  "repository": "https://github.com/scala-digest/agent4s",
+  "license": "MIT",
+  "keywords": ["scala", "code-intelligence", "ai-agent", "bug-hunt", "static-analysis", "taint-analysis", "dead-code", "call-graph", "mcp"]
+}

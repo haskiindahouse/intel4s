@@ -2,17 +2,17 @@
 
 Native GraalVM binary, Macbook Pro, Apple Silicon M3 Max, measured March 2026.
 
-Reproducible via `.claude/skills/benchmark/scripts/bench.sh` using [hyperfine](https://github.com/sharkdp/hyperfine) against the [Scala 3 compiler repo](https://github.com/scala/scala3) (18,485 files, cloned with `--depth=1`).
+Reproducible via `.claude/skills/benchmark/scripts/bench.sh` using [hyperfine](https://github.com/sharkdp/hyperfine) against the [Scala 3 compiler repo](https://github.com/scala/scala3) (18,703 files, cloned with `--depth=1`).
 
 ## Test project
 
 | Metric | Value |
 |--------|-------|
-| Files indexed | 18,485 |
-| Symbols indexed | 144,211 |
-| Packages | 603 |
+| Files indexed | 18,703 |
+| Symbols indexed | 148,179 |
+| Packages | 611 |
 | Cache size (`.scalex/index.bin`) | 21 MB |
-| Parse failures | 1,354 (Scala 2 files without Scala 3 fallback) |
+| Parse failures | 1,175 (Scala 2 files without Scala 3 fallback) |
 
 ## Indexing (hyperfine, 5 runs)
 
@@ -126,3 +126,41 @@ Optimizations applied:
 | Microbenchmarks | `src/bench.scala` | Per-function isolation with statistics |
 
 See `profiling/README.md` for usage details.
+
+## agent4s vs grep — real comparison on scala3 compiler
+
+Tested on scala3 repo (18,703 `.scala` files, 148,179 symbols, 611 packages).
+
+### Import resolution: `Compiler`
+
+| Tool | Files found | Resolves wildcards? |
+|------|-------------|---------------------|
+| `agent4s imports Compiler` | **1,213** | Yes — `import dotty.tools.*`, `import scala.quoted.*` |
+| `grep -rl 'import.*Compiler'` | **86** | No — literal text match only |
+
+agent4s finds **14x more** import sites because it resolves wildcard and grouped imports through bloom filter pre-screening + word-boundary text matching.
+
+### Tasks grep cannot do
+
+| Task | agent4s command | Result |
+|------|----------------|--------|
+| Inheritance tree of `Compiler` | `hierarchy Compiler --depth 2` | 7 subclasses across 3 levels (ExpressionCompiler, TASTYCompiler, ReplCompiler, QuoteCompiler, InteractiveCompiler, TASTYDecompiler, residentCompiler) |
+| Dead code in `dotty.tools.dotc` | `unused dotty.tools.dotc --kind class` | **113 classes** with zero external references |
+| Project overview | `overview --concise` | 2,431 files, 39,491 symbols, 138 packages, dependency graph, hub types — **60 lines** |
+| Explain a type | `explain Compiler --brief` | Definition + 3 top members + 8 disambiguated alternatives |
+| Bug patterns | `bug-hunt --severity high --no-tests` | 30 findings across 16 files (see below) |
+
+### bug-hunt findings in scala3 compiler
+
+`bug-hunt -w scala3/ --severity high --no-tests` — 30 findings in 16 files, scanned 2,394 candidate files:
+
+| Category | Count | Example |
+|----------|-------|---------|
+| **Security: path traversal** | 16 | `Paths.get(arg)` with non-literal args in ClassfileWriters, CommandLineParser, coverage Serializer |
+| **Concurrency: nested synchronized** | 9 | `Names.scala:176,189,558`, `Types.scala:4269`, `BackendReporting.scala:65-77` (5 blocks) |
+| **Security: weak crypto** | 1 | `NameOps.scala:18` — `MessageDigest.getInstance("MD5")` |
+| **Security: ReDoS** | 1 | `InlinerHeuristics.scala:359` — `Pattern.compile(regex.toString)` from user input |
+| **Type safety: return in lambda** | 1 | `Parsers.scala:2412` — `return t` in lambda (deprecated Scala 3) |
+| **Security: taint flow** | 2 | `coverage/Serializer.scala:20,24` — method parameter flows to `Paths.get` (taint: MEDIUM) |
+
+All findings are real patterns in the production compiler. Zero compilation required — agent4s found these from source text alone in under 5 seconds.
