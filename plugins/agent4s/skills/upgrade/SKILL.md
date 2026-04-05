@@ -9,7 +9,7 @@ You are upgrading the scalex binary to the latest version.
 ## Step 1: Locate scalex-cli
 
 The scalex-cli bootstrap script is at the path relative to this skill:
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 Resolve the absolute path and verify it exists.
 
@@ -45,7 +45,7 @@ If versions differ → continue with upgrade.
 ## Step 5: Clear cached binary
 
 ```bash
-rm -rf ~/.cache/scalex/*
+rm -rf ~/.cache/agent4s/*
 ```
 
 This removes the cached native binary. The bootstrap script will re-download it on next invocation.

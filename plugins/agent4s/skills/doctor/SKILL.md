@@ -9,7 +9,7 @@ You are running diagnostics for agent4s in this project. Run each check and repo
 ## Locate scalex-cli
 
 The scalex-cli bootstrap script is at the path relative to this skill:
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 Resolve the absolute path. If it doesn't exist, report FAIL immediately and suggest reinstalling the plugin.
 
@@ -24,7 +24,7 @@ bash "<scalex-cli-path>" --version
 
 If FAIL, check:
 - Permission denied → suggest `chmod +x <scalex-cli-path>`
-- macOS quarantine → check with `xattr -l ~/.cache/scalex/* 2>/dev/null | grep quarantine` and suggest `xattr -d com.apple.quarantine ~/.cache/scalex/*`
+- macOS quarantine → check with `xattr -l ~/.cache/agent4s/* 2>/dev/null | grep quarantine` and suggest `xattr -d com.apple.quarantine ~/.cache/agent4s/*`
 - Binary not found → the bootstrap script should auto-download; run `bash "<scalex-cli-path>" --version` again and check stderr for download errors
 
 ## Check 2: Index
@@ -72,11 +72,11 @@ If OK, also check if the section content is stale:
 Only run this check on macOS (check `uname -s`):
 
 ```bash
-xattr -l ~/.cache/scalex/* 2>/dev/null | grep -c quarantine
+xattr -l ~/.cache/agent4s/* 2>/dev/null | grep -c quarantine
 ```
 
 - **OK**: 0 matches → no quarantine issues
-- **WARNING**: quarantine attribute found → suggest `xattr -d com.apple.quarantine ~/.cache/scalex/*`
+- **WARNING**: quarantine attribute found → suggest `xattr -d com.apple.quarantine ~/.cache/agent4s/*`
 
 ## Summary
 

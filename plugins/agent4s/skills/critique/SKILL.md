@@ -9,7 +9,7 @@ Conduct a holistic architecture critique of this Scala codebase or specific area
 
 ## Step 1: Locate scalex-cli
 
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 ## Step 2: Understand the architecture
 

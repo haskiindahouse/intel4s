@@ -9,7 +9,7 @@ You are setting up agent4s for this Scala project. Follow these steps exactly.
 ## Step 1: Locate scalex-cli
 
 The scalex-cli bootstrap script is at the path relative to this skill:
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 Resolve the absolute path and verify it exists. If it doesn't exist, tell the user to reinstall the plugin.
 

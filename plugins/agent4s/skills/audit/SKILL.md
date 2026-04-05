@@ -10,7 +10,7 @@ Run a systematic quality audit of this Scala project and generate a comprehensiv
 ## Step 1: Locate scalex-cli
 
 The scalex-cli bootstrap script is at the path relative to this skill:
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 ## Step 2: Gather project context
 
