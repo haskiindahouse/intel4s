@@ -8,14 +8,14 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-  <a href="#all-37-commands"><img src="https://img.shields.io/badge/commands-39-brightgreen.svg" alt="37 Commands"></a>
+  <a href="#all-35-commands"><img src="https://img.shields.io/badge/commands-35-brightgreen.svg" alt="35 Commands"></a>
 </p>
 
 ---
 
 Your AI agent treats Scala like plain text. `grep` finds 50 things named `Config`. agent4s finds the one you mean.
 
-**39 commands** for code navigation, refactoring, dead code detection, and bug hunting. No build server. No compilation. From `git clone` to first answer in 349ms.
+**35 commands** for code navigation, refactoring, dead code detection, and bug hunting. No build server. No compilation. From `git clone` to first answer in 349ms.
 
 ```bash
 # Claude Code
@@ -88,7 +88,7 @@ Then in your project:
 
 ### MCP Server
 
-39 commands exposed as MCP tools. In-memory index caching between calls. Copy-paste the config for your editor:
+35 commands exposed as MCP tools. In-memory index caching between calls. Copy-paste the config for your editor:
 
 <details>
 <summary><strong>Cursor</strong> — <code>.cursor/mcp.json</code></summary>
@@ -310,7 +310,7 @@ agent4s grep "pattern" --in ClassName --each-method   # regex scoped to a type's
 ```
 
 <details>
-<summary><strong>All 39 commands</strong></summary>
+<summary><strong>All 35 commands</strong></summary>
 
 ```
 search          Fuzzy camelCase symbol search

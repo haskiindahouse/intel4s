@@ -76,7 +76,7 @@ This project uses the [agent4s](https://github.com/scala-digest/agent4s) plugin 
 - **Use grep/Grep tool** for: non-Scala files, string literals, regex patterns in comments, files not yet git-tracked
 
 ### Available skills
-- `/agent4s:scalex` — 36 commands for Scala code intelligence (always available)
+- `/agent4s:scalex` — 35 commands for Scala code intelligence (always available)
 - `/agent4s:setup` — re-run this setup to refresh project info
 - `/agent4s:semanticdb` — enable SemanticDB for type-aware rename and call-graph
 - `/agent4s:upgrade` — upgrade scalex binary to latest release

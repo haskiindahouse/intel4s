@@ -292,6 +292,18 @@ echo -e "def UserService\ngrep processPayment\nimpl UserService" | scalex batch 
 
 Normally not needed — every command auto-reindexes changed files. Use after major branch switches or large merges to get a clean reindex.
 
+### `scalex bug-hunt [--severity S] [--bug-category C] [--hotspots] [--reachable] [--depth N]` — scan for bugs
+
+Scans all indexed files for common bug patterns (45 AST patterns across security, crypto, effects, and type safety). Use `--reachable` to filter findings to methods reachable from entrypoints. `--hotspots` ranks files by finding density.
+
+### `scalex memory list [--pattern P] [--file F]` / `memory add` / `memory remove <index>` — suppression memories
+
+Manage `.scalex/memories.json` for suppressing false positives from bug-hunt. Three scope levels: global, file-scoped (`--file`), method-scoped (`--file` + `--method`). Use `memory add --pattern OptionGet --scope file --file "src/cli.scala" --reason "CLI flag parsing uses .get safely"`.
+
+### `scalex pattern validate <spec.json> [spec2.json ...]` — validate pattern specs
+
+Validates `.pattern-spec.json` files against the scanner. Runs positive test (must trigger), negative test (must not trigger), and optional suppressed test. Used for meta-fuzzing the bug-hunt scanner.
+
 ### `scalex mcp` — MCP server mode
 
 Starts a persistent MCP (Model Context Protocol) server over STDIO. Exposes all scalex commands as MCP tools (`scalex_search`, `scalex_def`, `scalex_refs`, etc.) for integration with Cursor, Windsurf, Cline, and any MCP-compatible tool. The index is cached in memory between tool calls for faster response times.

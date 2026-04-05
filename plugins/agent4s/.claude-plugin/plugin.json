@@ -1,7 +1,7 @@
 {
   "name": "agent4s",
   "version": "0.5.0",
-  "description": "Scala superpowers for AI agents. 37 commands: search, rename, dead code, bug hunting with taint analysis, call-graph, scaffolding. 349ms on 18K files. No build server.",
+  "description": "Scala superpowers for AI agents. 35 commands: search, rename, dead code, bug hunting with taint analysis, call-graph, scaffolding. 349ms on 18K files. No build server.",
   "author": {
     "name": "scala-digest"
   },

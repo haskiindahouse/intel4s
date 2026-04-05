@@ -23,7 +23,7 @@ Determine the workspace from the user's project root directory.
 
 ## Available commands
 
-scalex has 36 commands. The most important for your workflows:
+scalex has 35 commands. The most important for your workflows:
 
 | Command | Purpose |
 |---|---|

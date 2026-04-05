@@ -29,16 +29,18 @@ def buildReachableSet(
   if rawEntries.isEmpty then
     (reachableSet = Set.empty, entrypointMap = Map.empty)
   else
-    val reachableSet    = mutable.HashSet.empty[String]
-    val entrypointMap   = mutable.HashMap.empty[String, mutable.ListBuffer[String]]
+    val acc: BfsAcc = (
+      reachable   = mutable.HashSet.empty[String],
+      entrypoints = mutable.HashMap.empty[String, mutable.ListBuffer[String]]
+    )
 
     rawEntries.foreach { sym =>
-      bfsFromEntrypoint(sym.name, sym, idx, maxDepth, reachableSet, entrypointMap)
+      bfsFromEntrypoint(sym.name, sym, idx, maxDepth, acc)
     }
 
     (
-      reachableSet  = reachableSet.toSet,
-      entrypointMap = entrypointMap.view.mapValues(_.toList).toMap
+      reachableSet  = acc.reachable.toSet,
+      entrypointMap = acc.entrypoints.view.mapValues(_.toList).toMap
     )
 
 /** Find the innermost enclosing def for a given file+line, using extractScopes. */
@@ -87,6 +89,9 @@ private def collectEntrypoints(idx: WorkspaceIndex, includeTests: Boolean): List
 
   results.toList
 
+// WHY: Single accumulator type to keep bfsFromEntrypoint at ≤5 params (size limit invariant).
+private type BfsAcc = (reachable: mutable.HashSet[String], entrypoints: mutable.HashMap[String, mutable.ListBuffer[String]])
+
 /** BFS expansion from one entrypoint.
   *
   * We extract the symbol's body text, extract word identifiers from it,
@@ -98,15 +103,14 @@ private def bfsFromEntrypoint(
   sym: SymbolInfo,
   idx: WorkspaceIndex,
   maxDepth: Int,
-  reachableSet: mutable.HashSet[String],
-  entrypointMap: mutable.HashMap[String, mutable.ListBuffer[String]]
+  acc: BfsAcc
 ): Unit =
   // Each queue entry: (symbol name, ownerName hint, file, current depth)
   val queue = mutable.Queue.empty[(name: String, file: Path, depth: Int)]
 
   def markReachable(name: String, depth: Int): Unit = {
-    reachableSet += name
-    entrypointMap.getOrElseUpdate(name, mutable.ListBuffer.empty) += entrypointName
+    acc.reachable += name
+    acc.entrypoints.getOrElseUpdate(name, mutable.ListBuffer.empty) += entrypointName
   }
 
   // Seed from the entrypoint itself
@@ -119,7 +123,7 @@ private def bfsFromEntrypoint(
       // Extract callees from method body text
       val callees = calleesFromBody(methodName, file, idx)
       callees.foreach { callee =>
-        if !reachableSet.contains(callee.name) then
+        if !acc.reachable.contains(callee.name) then
           markReachable(callee.name, depth + 1)
           // Enqueue the callee for further expansion using its definition file
           val calleeFile = callee.file.getOrElse(file)
@@ -133,9 +137,7 @@ private def calleesFromBody(methodName: String, file: Path, idx: WorkspaceIndex)
   if bodies.isEmpty then Nil
   else
     val bodyText = bodies.head.sourceText
-    val words    = extractBodyWords(bodyText)
-    words -= methodName  // avoid self-reference
-    scalaKeywordsForReachability.foreach(words -= _)
+    val words    = extractBodyWords(bodyText) - methodName -- scalaKeywordsForReachability
 
     val result = mutable.ListBuffer.empty[CalleeInfo]
     val seen   = mutable.HashSet.empty[String]
@@ -155,12 +157,12 @@ private def calleesFromBody(methodName: String, file: Path, idx: WorkspaceIndex)
 /** Extract unique identifier words from a source text snippet.
   * WHY: Pattern matches any Java identifier — including single-char names like e, f, x.
   * This is intentionally broad; false positives are filtered by keyword list + index lookup. */
-private def extractBodyWords(text: String): mutable.HashSet[String] =
+private def extractBodyWords(text: String): Set[String] =
   val identPattern = java.util.regex.Pattern.compile("""[a-zA-Z_]\w*""")
   val matcher      = identPattern.matcher(text)
   val words        = mutable.HashSet.empty[String]
   while matcher.find() do words += matcher.group()
-  words
+  words.toSet
 
 // WHY: Same keyword list as call-graph.scala to avoid false callee matches on language keywords.
 private val scalaKeywordsForReachability: Set[String] = Set(
