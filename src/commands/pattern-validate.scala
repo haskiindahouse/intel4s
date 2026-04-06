@@ -61,8 +61,9 @@ private def parsePatternSpec(json: String): Either[String, PatternSpec] =
 
 // ── Scan helper — writes temp file, runs scanFile, returns findings ───────
 
+// WHY: Use system temp dir, not workspace — avoids interfering with concurrent indexing.
 private def scanCodeSnippet(code: String, workspace: Path): List[BugFinding] =
-  val tmpFile = Files.createTempFile(workspace, "pspec-validate-", ".scala")
+  val tmpFile = Files.createTempFile("pspec-validate-", ".scala")
   val wrapped = s"object PatternSpecValidator {\n$code\n}"
   Files.writeString(tmpFile, wrapped)
   try

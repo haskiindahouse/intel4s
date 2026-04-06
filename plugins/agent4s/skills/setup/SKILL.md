@@ -9,7 +9,7 @@ You are setting up agent4s for this Scala project. Follow these steps exactly.
 ## Step 1: Locate scalex-cli
 
 The scalex-cli bootstrap script is at the path relative to this skill:
-`../scalex/scripts/scalex-cli`
+`../agent4s/scripts/scalex-cli`
 
 Resolve the absolute path and verify it exists. If it doesn't exist, tell the user to reinstall the plugin.
 
@@ -76,7 +76,7 @@ This project uses the [agent4s](https://github.com/scala-digest/agent4s) plugin 
 - **Use grep/Grep tool** for: non-Scala files, string literals, regex patterns in comments, files not yet git-tracked
 
 ### Available skills
-- `/agent4s:scalex` — 36 commands for Scala code intelligence (always available)
+- `/agent4s:scalex` — 35 commands for Scala code intelligence (always available)
 - `/agent4s:setup` — re-run this setup to refresh project info
 - `/agent4s:semanticdb` — enable SemanticDB for type-aware rename and call-graph
 - `/agent4s:upgrade` — upgrade scalex binary to latest release

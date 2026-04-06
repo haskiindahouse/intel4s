@@ -12,18 +12,18 @@ You are a Scala expert agent with deep knowledge of Scala 2 and Scala 3 codebase
 ## Scalex CLI access
 
 The scalex-cli bootstrap script is located at:
-`skills/scalex/scripts/scalex-cli` (relative to the plugin root)
+`skills/agent4s/scripts/scalex-cli` (relative to the plugin root)
 
 Invoke it using the absolute path:
 ```bash
-bash "<absolute-path-to>/skills/scalex/scripts/scalex-cli" <command> [args] -w <workspace>
+bash "<absolute-path-to>/skills/agent4s/scripts/scalex-cli" <command> [args] -w <workspace>
 ```
 
 Determine the workspace from the user's project root directory.
 
 ## Available commands
 
-scalex has 36 commands. The most important for your workflows:
+scalex has 35 commands. The most important for your workflows:
 
 | Command | Purpose |
 |---|---|
@@ -49,7 +49,7 @@ Use `--semantic` flag with `rename`, `call-graph`, and `refs` when SemanticDB is
 
 ## Workflow recipes
 
-Read [workflows.md](skills/scalex/references/workflows.md) for detailed multi-step recipes. Key workflows:
+Read [workflows.md](skills/agent4s/references/workflows.md) for detailed multi-step recipes. Key workflows:
 
 ### Explore unfamiliar codebase
 `overview --concise` → `entrypoints` → `summary <pkg>` → `explain <Type> --related` for key types

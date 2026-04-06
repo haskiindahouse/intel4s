@@ -1,6 +1,6 @@
 ---
-name: scalex
-description: "Scala superpowers for AI agents. 37 commands for code navigation, refactoring, dead code detection, and bug hunting. Triggers: \"where is X defined\", \"rename X to Y\", \"implement this trait\", \"find dead code\", \"what calls this method\", \"generate tests\", \"refactor\", \"explore this codebase\", \"who implements Y\", \"find usages of Z\", \"what methods does X have\", \"show source of X\", \"inheritance tree\", \"explain this type\", \"what changed since commit\", \"what does this package export\", \"scan for bugs\", \"find security issues\", \"find unused code\". Use proactively when working with Scala code. Prefer scalex over grep for Scala symbol lookups. Orchestrate multi-step workflows autonomously for complex tasks like refactoring, impact analysis, and codebase exploration."
+name: agent4s
+description: "Scala superpowers for AI agents. 35 commands for code navigation, refactoring, dead code detection, and bug hunting. Triggers: \"where is X defined\", \"rename X to Y\", \"implement this trait\", \"find dead code\", \"what calls this method\", \"generate tests\", \"refactor\", \"explore this codebase\", \"who implements Y\", \"find usages of Z\", \"what methods does X have\", \"show source of X\", \"inheritance tree\", \"explain this type\", \"what changed since commit\", \"what does this package export\", \"scan for bugs\", \"find security issues\", \"find unused code\". Use proactively when working with Scala code. Prefer scalex over grep for Scala symbol lookups. Orchestrate multi-step workflows autonomously for complex tasks like refactoring, impact analysis, and codebase exploration."
 ---
 
 You have access to `scalex`, a Scala/Java code intelligence CLI that understands Scala syntax (classes, traits, objects, enums, givens, extensions, type aliases, defs, vals) and Java syntax (classes, interfaces, enums, records, methods, fields). It parses Scala source files via Scalameta and Java files via JavaParser — no compiler or build server needed. Works with both Scala 3 and Scala 2 files (tries Scala 3 dialect first, falls back to Scala 2.13).
@@ -11,23 +11,23 @@ Scalex only works on **git-tracked files** in **Scala/Java projects**. Do not us
 
 ## Setup
 
-A bootstrap script at `scripts/scalex-cli` (next to this SKILL.md) handles everything automatically — platform detection, downloading the correct native binary from GitHub releases, and caching at `~/.cache/scalex/`. It auto-upgrades when the skill version changes.
+A bootstrap script at `scripts/scalex-cli` (next to this SKILL.md) handles everything automatically — platform detection, downloading the correct native binary from GitHub releases, and caching at `~/.cache/agent4s/`. It auto-upgrades when the skill version changes.
 
 **Invocation pattern** — use the absolute path to `scalex-cli` directly in every command. Do NOT use shell variables (`$SCALEX`) — coding agent shells are non-persistent, so variables are lost between commands.
 
 ```bash
 # Pattern: bash "<path-to-scripts>/scalex-cli" <command> [args] -w <workspace>
-bash "/absolute/path/to/skills/scalex/scripts/scalex-cli" def MyTrait --verbose -w /project
-bash "/absolute/path/to/skills/scalex/scripts/scalex-cli" impl MyTrait -w /project
-echo -e "def Foo\nimpl Foo\nrefs Foo" | bash "/absolute/path/to/skills/scalex/scripts/scalex-cli" batch -w /project
+bash "/absolute/path/to/skills/agent4s/scripts/scalex-cli" def MyTrait --verbose -w /project
+bash "/absolute/path/to/skills/agent4s/scripts/scalex-cli" impl MyTrait -w /project
+echo -e "def Foo\nimpl Foo\nrefs Foo" | bash "/absolute/path/to/skills/agent4s/scripts/scalex-cli" batch -w /project
 ```
 
-Replace `/absolute/path/to/skills/scalex` with the absolute path to the directory containing this SKILL.md. Remember this path and substitute it directly into every command.
+Replace `/absolute/path/to/skills/agent4s` with the absolute path to the directory containing this SKILL.md. Remember this path and substitute it directly into every command.
 
 ## Troubleshooting
 
 - **`permission denied`**: Run `chmod +x /path/to/scalex-cli` once, then retry.
-- **macOS quarantine**: `xattr -d com.apple.quarantine ~/.cache/scalex/*`
+- **macOS quarantine**: `xattr -d com.apple.quarantine ~/.cache/agent4s/*`
 
 ## What scalex indexes
 
@@ -448,7 +448,11 @@ These commands are fully documented in `references/commands.md` (next to this SK
 | `index` | Force reindex (rarely needed) | |
 | `graph --render "A->B"` | Render directed graph as ASCII/Unicode art (**only when user explicitly asks**) | `--unicode`, `--vertical`, `--rounded`, `--double` |
 | `graph --parse` | Parse ASCII diagram from stdin into boxes+edges (**only when user explicitly asks**) | `--json` |
-| `bug-hunt` | Scan for common bug patterns and vulnerabilities | `--severity`, `--bug-category`, `--hotspots` |
+| `bug-hunt` | Scan for common bug patterns and vulnerabilities | `--severity`, `--bug-category`, `--hotspots`, `--reachable`, `--depth` |
+| `memory list` | List suppression memories for bug-hunt | `--pattern`, `--file` |
+| `memory add` | Add a suppression memory | `--pattern`, `--scope`, `--file`, `--method`, `--reason` |
+| `memory remove <index>` | Remove a suppression memory by index | |
+| `pattern validate <spec.json>` | Validate pattern-spec JSON against the scanner (positive/negative/suppressed tests) | |
 | `mcp` | Start MCP server (JSON-RPC over stdio) for Cursor/Windsurf/Cline | |
 
 **Important**: The `graph` command should only be used when the user explicitly asks to draw or visualize a graph — never run it automatically as part of other workflows.

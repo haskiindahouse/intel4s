@@ -8,14 +8,14 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
-  <a href="#all-37-commands"><img src="https://img.shields.io/badge/commands-37-brightgreen.svg" alt="37 Commands"></a>
+  <a href="#all-35-commands"><img src="https://img.shields.io/badge/commands-35-brightgreen.svg" alt="35 Commands"></a>
 </p>
 
 ---
 
 Your AI agent treats Scala like plain text. `grep` finds 50 things named `Config`. agent4s finds the one you mean.
 
-**37 commands** for code navigation, refactoring, dead code detection, and bug hunting. No build server. No compilation. From `git clone` to first answer in 349ms.
+**35 commands** for code navigation, refactoring, dead code detection, and bug hunting. No build server. No compilation. From `git clone` to first answer in 349ms.
 
 ```bash
 # Claude Code
@@ -88,7 +88,7 @@ Then in your project:
 
 ### MCP Server
 
-37 commands exposed as MCP tools. In-memory index caching between calls. Copy-paste the config for your editor:
+35 commands exposed as MCP tools. In-memory index caching between calls. Copy-paste the config for your editor:
 
 <details>
 <summary><strong>Cursor</strong> — <code>.cursor/mcp.json</code></summary>
@@ -179,7 +179,45 @@ scala-cli run src/ -- search /path/to/project MyClass
 
 ## bug-hunt
 
-Static analysis for Scala that doesn't need your build to compile.
+Static analysis for Scala that doesn't need your build to compile. Self-improving: learns from every triage.
+
+```
+                            bug-hunt pipeline
+                            ─────────────────
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │                                                                  │
+  │   ┌─────────────┐   ┌─────────────┐   ┌────────────────────┐   │
+  │   │  AST Scan   │──▶│ Reachability │──▶│    LLM Triage      │   │
+  │   │             │   │   Filter     │   │                    │   │
+  │   │ 45 patterns │   │             │   │ Read context code  │   │
+  │   │ taint trace │   │ entrypoints │   │ Classify each:     │   │
+  │   │ credential  │   │ call-graph  │   │  ✓ Confirmed       │   │
+  │   │ detection   │   │ depth limit │   │  ? Likely           │   │
+  │   └─────────────┘   └─────────────┘   │  ✗ False positive  │   │
+  │         ▲                              └──────┬─────────────┘   │
+  │         │                                     │                 │
+  │         │   ┌──────────────────┐              │                 │
+  │         │   │   Suppression    │◀─── ✗ FP ───┘                 │
+  │         │   │    Memories      │         ┌────────────────┐     │
+  │         │   │                  │    ✓ ──▶│    Report      │     │
+  │         │   │ .scalex/        │    ? ──▶│               │     │
+  │         │   │ memories.json   │         │ + GitHub issue │     │
+  │         │   └────────┬─────────┘         │   cross-ref   │     │
+  │         │            │                   │ + repro script │     │
+  │         │            │ auto-suppress     └────────────────┘     │
+  │         └────────────┘ on next scan                             │
+  │                                                                  │
+  └──────── self-improving loop: fewer false positives each run ────┘
+```
+
+### How the loop works
+
+1. **Scan** — 45 AST patterns + cross-file taint analysis + credential regex. Bloom filter pre-screens files. Parallel scan with 20s timeout.
+2. **Reachability** — `--reachable` filters to findings reachable from entrypoints (routes, `@main`, `extends App`). Dead code excluded.
+3. **LLM Triage** — `/agent4s:bug-hunt` skill reads surrounding code, classifies each finding. Known patterns: ZIO `Ref.get` vs `Option.get`, test-only secrets, safe casts after match.
+4. **Memory** — false positives auto-recorded: `memory add <pattern> --source llm-triage`. Stored in `.scalex/memories.json` (version-controllable, shareable).
+5. **Next scan** — memories loaded at scan start, matching findings suppressed. Fewer false positives with each run.
 
 **45 patterns** across 7 categories:
 
@@ -198,8 +236,11 @@ Static analysis for Scala that doesn't need your build to compile.
 ```bash
 agent4s bug-hunt -w /path/to/project              # all patterns
 agent4s bug-hunt --severity critical --no-tests    # critical only, production code
+agent4s bug-hunt --reachable                       # only findings reachable from entrypoints
 agent4s bug-hunt --hotspots                        # files ranked by findings x git churn
 agent4s bug-hunt --json                            # structured output for CI
+agent4s memory list                                # show suppression memories
+agent4s pattern validate spec.json                 # validate a CVE-to-pattern spec
 ```
 
 ---
@@ -269,7 +310,7 @@ agent4s grep "pattern" --in ClassName --each-method   # regex scoped to a type's
 ```
 
 <details>
-<summary><strong>All 37 commands</strong></summary>
+<summary><strong>All 35 commands</strong></summary>
 
 ```
 search          Fuzzy camelCase symbol search
@@ -305,6 +346,8 @@ rename          Word-boundary rename (text or semantic)
 unused          Symbols with zero external references
 call-graph      Callees (from body) + callers (from refs) of a method
 bug-hunt        45 AST patterns + taint analysis + hotspot ranking
+memory          Suppression memory management (list/add/remove/export/import)
+pattern         CVE-to-pattern validation pipeline
 scaffold impl   Generate override stubs for unimplemented members
 scaffold test   Generate test suite skeleton
 graph           ASCII/Unicode directed graph rendering

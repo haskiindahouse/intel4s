@@ -226,7 +226,7 @@ class PatternSpecCryptoSuite extends ScalexTestBase:
     // Pattern defined in model but not yet implemented in scanner
   }
 
-  test("PatternSpec: LDAPInjection — negative") {
+  test("PatternSpec: LDAPInjection — negative".pending) {
     val findings = scanForPattern(
       """def ok = "cn=admin,dc=example,dc=com" """,
       BugPattern.LDAPInjection

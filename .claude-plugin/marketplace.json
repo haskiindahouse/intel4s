@@ -4,14 +4,14 @@
     "name": "scala-digest"
   },
   "metadata": {
-    "description": "Scala superpowers for AI coding agents — 37 commands, 349ms, no build server",
+    "description": "Scala superpowers for AI coding agents — 35 commands, 349ms, no build server",
     "pluginRoot": "."
   },
   "plugins": [
     {
       "name": "agent4s",
       "source": "./plugins/agent4s",
-      "description": "Scala superpowers for AI agents. 37 commands: search, rename, dead code detection, bug hunting with taint analysis, call-graph, scaffolding. From git clone to first answer in 349ms. No build server needed — type-aware with SemanticDB.",
+      "description": "Scala superpowers for AI agents. 35 commands: search, rename, dead code detection, bug hunting with taint analysis, call-graph, scaffolding. From git clone to first answer in 349ms. No build server needed — type-aware with SemanticDB.",
       "version": "0.5.0",
       "author": {
         "name": "scala-digest"

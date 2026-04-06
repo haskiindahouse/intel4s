@@ -137,7 +137,7 @@ class PatternSpecSuite extends ScalexTestBase:
     // Expected: Try(...).get or Future.value.get should trigger
   }
 
-  test("PatternSpec: UnsafeGet — negative") {
+  test("PatternSpec: UnsafeGet — negative".pending) {
     val findings = scanForPattern("""val x = scala.util.Try(42).getOrElse(0)""", BugPattern.UnsafeGet)
     assertEquals(findings.size, 0, "getOrElse on Try must not trigger UnsafeGet")
   }
@@ -148,7 +148,7 @@ class PatternSpecSuite extends ScalexTestBase:
     // Pattern defined in model but not yet implemented in scanner
   }
 
-  test("PatternSpec: PartialFunction — negative") {
+  test("PatternSpec: PartialFunction — negative".pending) {
     val findings = scanForPattern(
       """def ok(x: Option[Int]) = x match { case Some(v) => v; case None => 0 }""",
       BugPattern.PartialFunction

@@ -6,7 +6,7 @@
 
 **Category:** AI agent tooling for Scala (no direct competitor in this category).
 
-**Positioning:** Your AI agent treats Scala like plain text. grep finds 50 things named `Config`. agent4s finds the one you mean. 37 commands for code navigation, refactoring, dead code detection, and bug hunting — from `git clone` to first answer in 349ms.
+**Positioning:** Your AI agent treats Scala like plain text. grep finds 50 things named `Config`. agent4s finds the one you mean. 35 commands for code navigation, refactoring, dead code detection, and bug hunting — from `git clone` to first answer in 349ms.
 
 **Primary audience:**
 - Scala developers using AI coding tools (Claude Code, Cursor, Windsurf, Cline)

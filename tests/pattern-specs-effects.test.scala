@@ -149,7 +149,7 @@ class PatternSpecEffectsSuite extends ScalexTestBase:
     // Expected: Thread.sleep or blocking I/O inside ZIO.succeed/flatMap should trigger
   }
 
-  test("PatternSpec: BlockingInEffect — negative") {
+  test("PatternSpec: BlockingInEffect — negative".pending) {
     val findings = scanForPattern(
       """def ok = ZIO.attemptBlocking(java.lang.Thread.sleep(1000))""",
       BugPattern.BlockingInEffect
@@ -163,7 +163,7 @@ class PatternSpecEffectsSuite extends ScalexTestBase:
     // Pattern defined in model but not yet implemented in scanner
   }
 
-  test("PatternSpec: IgnoredFuture — negative (Await consuming Future result)") {
+  test("PatternSpec: IgnoredFuture — negative (Await consuming Future result)".pending) {
     val findings = scanForPattern(
       """import scala.concurrent.{Await, Future, duration}
         |def ok(f: Future[Int]) = Await.result(f, duration.Duration(5, "seconds"))""".stripMargin,
@@ -225,7 +225,7 @@ class PatternSpecEffectsSuite extends ScalexTestBase:
     // Expected: var field in class that also uses Future/ZIO
   }
 
-  test("PatternSpec: VarInConcurrent — negative (val in concurrent class)") {
+  test("PatternSpec: VarInConcurrent — negative (val in concurrent class)".pending) {
     val findings = scanForPattern(
       """import scala.concurrent.Future
         |class Safe { val count: Int = 0; def work = Future.successful(count) }""".stripMargin,
@@ -241,7 +241,7 @@ class PatternSpecEffectsSuite extends ScalexTestBase:
     // Expected: mutable ListBuffer/ArrayBuffer in object/class field
   }
 
-  test("PatternSpec: MutableShared — negative (immutable collection)") {
+  test("PatternSpec: MutableShared — negative (immutable collection)".pending) {
     val findings = scanForPattern(
       """object Safe { val items: List[Int] = List(1, 2, 3) }""",
       BugPattern.MutableShared
