@@ -7,14 +7,13 @@ if [ -z "${BASH_VERSION:-}" ] && [ -f "$0" ]; then
 fi
 set -euo pipefail
 
-EXPECTED_VERSION="0.4.0"
+EXPECTED_VERSION="0.5.0"
 REPO="scala-digest/agent4s"
 
 # Expected SHA-256 checksums for each artifact (updated each release alongside EXPECTED_VERSION)
-# Will be populated after first release build
-CHECKSUM_scalex_macos_arm64="c421198205cfc21ab4808b5902df7291d7f87d9711d1a382adb637f0c30728d4"
-CHECKSUM_scalex_macos_x64="0dc318a9d8e8f8a5118cbac0f982edf30aabc8db8405d4bfa39704241e835220"
-CHECKSUM_scalex_linux_x64="d874a01ef5b07b67e299aa22cc83c609bcd609ef3b6e25db19aa6c85fc8c09ad"
+CHECKSUM_scalex_macos_arm64="af500a165987943b9a04439a9ad302453eb5342a0698e2190570dad84625f45e"
+CHECKSUM_scalex_macos_x64="50d0eeb367c594ea4ae93a369c9d87a4d88208dfe35a33d48418340474edfecc"
+CHECKSUM_scalex_linux_x64="6532b4ede408f079b9c68532f15a75fd73e6af488b010cad98b0d651488fe4cf"
 
 # Cache location: follow XDG spec
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/agent4s"
