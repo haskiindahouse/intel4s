@@ -55,14 +55,7 @@ jobs:
       - name: Build native image (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: |
-          scala-cli.bat package --native-image \
-            src/ \
-            -o "${{ matrix.artifact }}.exe" \
-            --force \
-            -- --no-fallback \
-            --initialize-at-run-time=com.google.common.hash.Striped64,com.google.common.hash.LongAdder,com.google.common.hash.BloomFilter,com.google.common.hash.BloomFilterStrategies \
-            --exclude-config ".*jline.*" ".*"
+        run: ./build-native.sh "${{ matrix.artifact }}.exe"
 
       - name: Test binary (Unix)
         if: runner.os != 'Windows'
