@@ -56,7 +56,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          scala-cli package --native-image \
+          scala-cli.bat package --native-image \
             src/ \
             -o "${{ matrix.artifact }}.exe" \
             --force \
